@@ -13,6 +13,10 @@ declare(strict_types=1);
  * Инструменты: get_time, calculator.
  * Флаги: toolChoice=required, toolApproval, maxRounds, historyLimit.
  *
+ * Важно: не все локальные серверы (llama.cpp, Ollama) поддерживают
+ * tool_choice=required — тогда флаг молча игнорируется, и модель отвечает
+ * текстом. Пример это честно показывает.
+ *
  * Запуск:
  *   php examples/05-settings.php
  */
@@ -35,7 +39,13 @@ $forced = new Agent($client, $tools, 'Отвечай одной строкой.'
 
 echo "1) tool_choice=required\n";
 echo '   ответ: ' . $forced->ask('Поздоровайся со мной.') . PHP_EOL;
-echo '   вызовов: ' . count($forced->trace()) . PHP_EOL . PHP_EOL;
+echo '   вызовов: ' . count($forced->trace()) . PHP_EOL;
+
+if ($forced->trace() === []) {
+    echo '   (провайдер проигнорировал tool_choice=required)' . PHP_EOL;
+}
+
+echo PHP_EOL;
 
 // --- 2. toolApproval: запрет вызова ----------------------------------------
 // Колбэк получает имя и аргументы. false — инструмент не выполняется,
@@ -70,4 +80,5 @@ $memory = new Agent($client, $tools, 'Отвечай одним словом.', 
 $memory->ask('Меня зовут Роман.');
 $memory->ask('Как меня зовут?');
 echo '   сообщений в истории: ' . count($memory->messages()) . ' (лимит 40)' . PHP_EOL;
+
 
