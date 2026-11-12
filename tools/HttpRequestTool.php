@@ -6,6 +6,7 @@ namespace AiSdk\Tools;
 
 use AiSdk\HttpTransport;
 use AiSdk\HttpRequest;
+use AiSdk\Tools\Support\Timeout;
 use AiSdk\Tools\Support\UrlGuard;
 use AiSdk\Tool;
 
@@ -23,7 +24,6 @@ use AiSdk\Tool;
 final class HttpRequestTool implements Tool
 {
     private const MAX_REDIRECTS = 3;
-    private const TIMEOUT = 10.0;
     private const MAX_BYTES = 262144;
     private const MAX_BODY = 65536;
 
@@ -40,6 +40,8 @@ final class HttpRequestTool implements Tool
         array $auth = [],
         bool $allowPrivate = false,
         private readonly int $defaultChars = 4000,
+        private readonly float $timeout = 10.0,
+        private readonly float $maxTimeout = 60.0,
     ) {
         $normalized = [];
 
@@ -100,6 +102,10 @@ final class HttpRequestTool implements Tool
                     'type' => 'integer',
                     'description' => 'Сколько символов ответа вернуть, по умолчанию ' . $this->defaultChars . '.',
                 ],
+                'timeout' => [
+                    'type' => 'number',
+                    'description' => Timeout::parameterDescription($this->timeout, $this->maxTimeout),
+                ],
             ],
             'required' => ['url'],
             'additionalProperties' => false,
@@ -116,6 +122,7 @@ final class HttpRequestTool implements Tool
 
         $maxChars = (int) ($args['max_chars'] ?? $this->defaultChars);
         $maxChars = max(200, min($maxChars, 20000));
+        $timeout = Timeout::from($args, $this->timeout, $this->maxTimeout);
 
         $body = $args['body'] ?? null;
 
@@ -150,7 +157,7 @@ final class HttpRequestTool implements Tool
 
                 $response = HttpTransport::request(
                     $url,
-                    self::TIMEOUT,
+                    $timeout->seconds,
                     false,
                     self::MAX_BYTES,
                     $request->method,
@@ -226,5 +233,6 @@ final class HttpRequestTool implements Tool
 
 
 }
+
 
 

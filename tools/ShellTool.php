@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace AiSdk\Tools;
 
 use AiSdk\Tool;
+use AiSdk\Tools\Support\Timeout;
 
 /**
  * Выполнение команд оболочки.
@@ -30,7 +31,8 @@ final class ShellTool implements Tool
     /**
      * @param string|null $workdir каталог, где выполняется команда (по умолчанию текущий)
      * @param string $shell auto | bash | sh | cmd | powershell | pwsh
-     * @param float $timeout секунды до принудительного завершения
+     * @param float $timeout секунды до принудительного завершения (по умолчанию для модели)
+     * @param float $maxTimeout предел, который модель не может превысить
      * @param int $maxOutput предел вывода stdout/stderr в байтах
      * @param list<string> $allow если не пусто — разрешены только эти первые слова
      * @param string|null $tmpDir где создавать файлы вывода (по умолчанию системный temp)
@@ -39,6 +41,7 @@ final class ShellTool implements Tool
         ?string $workdir = null,
         string $shell = 'auto',
         private readonly float $timeout = 10.0,
+        private readonly float $maxTimeout = 120.0,
         private readonly int $maxOutput = 16000,
         private readonly array $allow = [],
         ?string $tmpDir = null,
@@ -70,6 +73,10 @@ final class ShellTool implements Tool
                     'type' => 'string',
                     'description' => 'Команда, например "ls -la" или "php -v".',
                 ],
+                'timeout' => [
+                    'type' => 'number',
+                    'description' => Timeout::parameterDescription($this->timeout, $this->maxTimeout),
+                ],
             ],
             'required' => ['command'],
             'additionalProperties' => false,
@@ -88,6 +95,8 @@ final class ShellTool implements Tool
             return 'Команда не разрешена: "' . $this->firstWord($command) . '". '
                 . 'Разрешены: ' . implode(', ', $this->allow) . '.';
         }
+
+        $timeout = Timeout::from($args, $this->timeout, $this->maxTimeout);
 
         try {
             $commandLine = $this->commandLine($command);
@@ -110,7 +119,7 @@ final class ShellTool implements Tool
         [$outFile, $errFile] = $files;
 
         try {
-            $run = $this->run($commandLine, $cwd, $outFile, $errFile);
+            $run = $this->run($commandLine, $cwd, $outFile, $errFile, $timeout->seconds);
         } catch (\RuntimeException $e) {
             return $e->getMessage();
         } finally {
@@ -120,7 +129,7 @@ final class ShellTool implements Tool
             @unlink($errFile);
         }
 
-        return $this->format($command, $stdout, $stderr, $run['timedOut'], $run['overflow'], $run['exitCode']);
+        return $this->format($command, $stdout, $stderr, $run['timedOut'], $run['overflow'], $run['exitCode'], $timeout->seconds);
     }
 
     /**
@@ -158,7 +167,7 @@ final class ShellTool implements Tool
      *
      * @return array{timedOut: bool, overflow: bool, exitCode: int}
      */
-    private function run(string $commandLine, string $cwd, string $outFile, string $errFile): array
+    private function run(string $commandLine, string $cwd, string $outFile, string $errFile, float $timeout): array
     {
         $process = @proc_open($commandLine, [
             0 => ['pipe', 'r'],
@@ -187,7 +196,7 @@ final class ShellTool implements Tool
                 break;
             }
 
-            if ((microtime(true) - $startedAt) > $this->timeout) {
+            if ((microtime(true) - $startedAt) > $timeout) {
                 $timedOut = true;
                 @proc_terminate($process, 9);
                 $this->killTree((int) $status['pid']);
@@ -297,11 +306,12 @@ final class ShellTool implements Tool
         bool $timedOut,
         bool $overflow,
         int $exitCode,
+        float $timeout,
     ): string {
         $lines = ['$ ' . $command];
 
         $lines[] = match (true) {
-            $timedOut => 'exit: таймаут ' . $this->timeout . ' с (процесс завершён)',
+            $timedOut => 'exit: таймаут ' . Timeout::format($timeout) . ' с (процесс завершён)',
             $overflow => 'exit: вывод превысил лимит, процесс завершён',
             default => 'exit: ' . $exitCode,
         };
@@ -335,3 +345,5 @@ final class ShellTool implements Tool
         return mb_strcut($text, 0, $this->maxOutput) . "\n… (обрезано)";
     }
 }
+
+

@@ -56,6 +56,11 @@ $result = $client->chat($messages, $tools = [], $options = []);
 // options: tool_choice, parallel_tool_calls, temperature, max_tokens
 $result->text; $result->toolCalls; $result->usage;
 
+// Расход и стоимость
+$agent->usage();                         // [prompt_tokens, completion_tokens] за диалог
+$cost = (new Cost())->withRate('model', input: 0.07, output: 0.28);
+echo $cost->format($cost->estimate('model', $agent->usage()));
+
 // Логирование поверх любого клиента
 $client = new LoggingClient($client, sink: fn (string $l) => error_log($l), verbose: true);
 
@@ -96,5 +101,6 @@ final class MyTool implements Tool {
 // Завершение: модель зовёт finish(result), Agent возвращает result
 $tools->add(new FinishTool());
 ```
+
 
 

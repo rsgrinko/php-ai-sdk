@@ -44,6 +44,7 @@ src/
   ChatResult.php       ответ модели: текст, tool_calls, usage
   Agent.php            цикл: вопрос → инструменты → ответ
   LoggingClient.php    декоратор: логи запросов и ответов
+  Cost.php             оценка стоимости по токенам и тарифу
   Tool.php             интерфейс инструмента
   ToolRegistry.php     набор инструментов
   HttpTransport.php    низкоуровневый HTTP: методы, тело, лимит размера
@@ -70,7 +71,7 @@ tools/
   DateCalcTool.php     разница дат и прибавление интервала
   UuidTool.php         UUID v4
   HashTool.php         sha256/sha1/md5
-  Support/             общие помощники: Bytes, FileWalker, UrlGuard, AtomicWriter
+  Support/             помощники: Bytes, FileWalker, UrlGuard, AtomicWriter, Timeout
 examples/
   01-chat.php          простой вопрос
   02-tools.php         агент с тремя инструментами
@@ -258,6 +259,7 @@ $agent->ask('вопрос');
 ---
 
 Лицензия: делайте что хотите.
+
 
 
 

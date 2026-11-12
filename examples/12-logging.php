@@ -18,6 +18,8 @@ require dirname(__DIR__) . '/bootstrap.php';
 
 use AiSdk\Agent;
 use AiSdk\AiClient;
+use AiSdk\Cost;
+use AiSdk\Env;
 use AiSdk\LoggingClient;
 use AiSdk\ToolRegistry;
 use AiSdk\Tools\CalculatorTool;
@@ -38,6 +40,17 @@ $agent = new Agent($client, $tools, 'Отвечай кратко, одной с�
 
 echo PHP_EOL . 'ответ: ' . $agent->ask('Который час в Москве и сколько будет 2+2?') . PHP_EOL;
 
+// Расход виден без декоратора: Agent копит usage по всем раундам.
+$usage = $agent->usage();
+$model = Env::get('AI_MODEL', 'deepseek-chat') ?? 'deepseek-chat';
+
+// Тарифы примерные — сверяйтесь с провайдером.
+$cost = (new Cost())->withRate($model, input: 0.07, output: 0.28);
+
+echo 'токены: ' . $usage['prompt_tokens'] . ' / ' . $usage['completion_tokens'] . PHP_EOL;
+echo 'стоимость: ' . $cost->format($cost->estimate($model, $usage)) . PHP_EOL;
+
 // Тот же декоратор без verbose пишет одну строку на запрос — удобно для продакшена:
 //
 //   $quiet = new LoggingClient(AiClient::fromEnv(), sink: fn ($l) => error_log($l));
+

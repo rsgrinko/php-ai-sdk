@@ -42,6 +42,9 @@ final class Agent
     /** @var list<array{name: string, arguments: array<string, mixed>, output: string, ms: int, blocked: bool}> */
     private array $trace = [];
 
+    /** @var array{prompt_tokens: int, completion_tokens: int} */
+    private array $usage = ['prompt_tokens' => 0, 'completion_tokens' => 0];
+
     private string $systemPrompt;
 
     /**
@@ -152,7 +155,7 @@ final class Agent
             ];
 
             // Без инструментов и без tool_choice: иначе API может отвергнуть запрос.
-            $result = $this->client->chat($this->messages, []);
+            $result = $this->send($this->messages, []);
         }
 
         $text = $result->text !== '' ? $result->text : '(модель вернула пустой ответ)';
@@ -182,12 +185,23 @@ final class Agent
     }
 
     /**
+     * Суммарный расход токенов за все запросы этого диалога.
+     *
+     * @return array{prompt_tokens: int, completion_tokens: int}
+     */
+    public function usage(): array
+    {
+        return $this->usage;
+    }
+
+    /**
      * Начать диалог заново.
      */
     public function reset(): void
     {
         $this->messages = [];
         $this->trace = [];
+        $this->usage = ['prompt_tokens' => 0, 'completion_tokens' => 0];
     }
 
     /**
@@ -398,7 +412,7 @@ final class Agent
 
     private function chat(bool $withToolChoice = false): ChatResult
     {
-        return $this->client->chat(
+        return $this->send(
             $this->messages,
             $this->tools->definitions(),
             $this->chatOptions($withToolChoice),
@@ -406,6 +420,24 @@ final class Agent
     }
 
     /**
+     * Один запрос к модели с накоплением расхода токенов.
+     *
+     * @param list<array<string, mixed>> $messages
+     * @param list<array<string, mixed>> $tools
+     * @param array<string, mixed> $options
+     */
+    private function send(array $messages, array $tools, array $options = []): ChatResult
+    {
+        $result = $this->client->chat($messages, $tools, $options);
+
+        $this->usage['prompt_tokens'] += (int) ($result->usage['prompt_tokens'] ?? 0);
+        $this->usage['completion_tokens'] += (int) ($result->usage['completion_tokens'] ?? 0);
+
+        return $result;
+    }
+
+    /**
      * Быстрый старт: агент с инструментами по умолчанию.
      */
 }
+
