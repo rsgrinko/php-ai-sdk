@@ -20,8 +20,17 @@ use AiSdk\ChatResult;
 use AiSdk\Tool;
 use AiSdk\ToolRegistry;
 use AiSdk\Tools\CalculatorTool;
+use AiSdk\Tools\ConvertUnitsTool;
+use AiSdk\Tools\CsvQueryTool;
+use AiSdk\Tools\DateCalcTool;
+use AiSdk\Tools\FileSandbox;
 use AiSdk\Tools\FinishTool;
+use AiSdk\Tools\HashTool;
+use AiSdk\Tools\HttpGetTool;
+use AiSdk\Tools\ListDirTool;
+use AiSdk\Tools\ReadFileTool;
 use AiSdk\Tools\TimeTool;
+use AiSdk\Tools\UuidTool;
 
 mb_internal_encoding('UTF-8');
 
@@ -125,6 +134,51 @@ function toolCall(string $name, array $arguments, string $id = 'call_1'): ChatRe
 function textResult(string $text): ChatResult
 {
     return new ChatResult($text, [], ['role' => 'assistant', 'content' => $text]);
+}
+
+/**
+ * Временный каталог для файловых инструментов.
+ */
+function testDir(): string
+{
+    $base = __DIR__ . '/tmp';
+
+    if (!is_dir($base) && !mkdir($base, 0777, true) && !is_dir($base)) {
+        throw new RuntimeException('не удалось создать tests/tmp');
+    }
+
+    $dir = $base . '/sandbox-' . bin2hex(random_bytes(3));
+
+    if (!mkdir($dir, 0777, true)) {
+        throw new RuntimeException('не удалось создать ' . $dir);
+    }
+
+    return $dir;
+}
+
+function removeDir(string $dir): void
+{
+    if (!is_dir($dir)) {
+        return;
+    }
+
+    $items = scandir($dir) ?: [];
+
+    foreach ($items as $item) {
+        if ($item === '.' || $item === '..') {
+            continue;
+        }
+
+        $path = $dir . '/' . $item;
+
+        if (is_dir($path)) {
+            removeDir($path);
+        } else {
+            @unlink($path);
+        }
+    }
+
+    @rmdir($dir);
 }
 
 /**
@@ -644,6 +698,236 @@ test('finish: можно отключить перехват через finishTo
 });
 
 // ---------------------------------------------------------------------------
+// Файлы
+// ---------------------------------------------------------------------------
+
+test('read_file: читает файл внутри корня', function (): void {
+    $dir = testDir();
+    file_put_contents($dir . '/note.txt', "первая\nвторая\nтретья");
+
+    $result = (new ReadFileTool(new FileSandbox($dir)))->handle(['path' => 'note.txt']);
+
+    assertContains('строки 1–3 из 3', $result);
+    assertContains('вторая', $result);
+});
+
+test('read_file: offset и limit в строках', function (): void {
+    $dir = testDir();
+    file_put_contents($dir . '/note.txt', "1\n2\n3\n4\n5");
+
+    $result = (new ReadFileTool(new FileSandbox($dir)))
+        ->handle(['path' => 'note.txt', 'offset' => 1, 'limit' => 2]);
+
+    assertContains('строки 2–3 из 5', $result);
+    assertContains("2\n3", $result);
+});
+
+test('read_file: побег через .. запрещён', function (): void {
+    $dir = testDir();
+    file_put_contents(dirname($dir) . '/outside.txt', 'секрет');
+
+    $result = (new ReadFileTool(new FileSandbox($dir)))->handle(['path' => '../outside.txt']);
+
+    assertContains('выходит за пределы', $result);
+});
+
+test('read_file: абсолютный путь запрещён', function (): void {
+    $dir = testDir();
+
+    $result = (new ReadFileTool(new FileSandbox($dir)))->handle(['path' => '/etc/passwd']);
+
+    assertContains('Абсолютные пути запрещены', $result);
+});
+
+test('read_file: бинарный файл не читается', function (): void {
+    $dir = testDir();
+    file_put_contents($dir . '/bin.dat', "\x00\x01\x02\xFF");
+
+    $result = (new ReadFileTool(new FileSandbox($dir)))->handle(['path' => 'bin.dat']);
+
+    assertContains('бинарный', $result);
+});
+
+test('list_dir: показывает каталоги и файлы', function (): void {
+    $dir = testDir();
+    mkdir($dir . '/sub');
+    file_put_contents($dir . '/a.txt', 'hello');
+
+    $result = (new ListDirTool(new FileSandbox($dir)))->handle([]);
+
+    assertContains('sub/', $result);
+    assertContains('a.txt', $result);
+});
+
+test('list_dir: выход за корень запрещён', function (): void {
+    $dir = testDir();
+
+    $result = (new ListDirTool(new FileSandbox($dir)))->handle(['path' => '..']);
+
+    assertContains('выходит за пределы', $result);
+});
+
+// ---------------------------------------------------------------------------
+// CSV
+// ---------------------------------------------------------------------------
+
+test('csv_query: фильтр по колонке', function (): void {
+    $dir = testDir();
+    file_put_contents(
+        $dir . '/people.csv',
+        "name,city,age\nИван,Тула,30\nМария,Москва,25\nПётр,Тула,41\n"
+    );
+
+    $result = (new CsvQueryTool(new FileSandbox($dir)))->handle([
+        'path' => 'people.csv',
+        'where' => 'city=Тула',
+    ]);
+
+    assertContains('Иван', $result);
+    assertContains('Пётр', $result);
+    assertTrue(!str_contains($result, 'Мария'), 'строка из другого города попала в выборку');
+    assertContains('2 из 3 строк', $result);
+});
+
+test('csv_query: вхождение подстроки и лимит', function (): void {
+    $dir = testDir();
+    file_put_contents($dir . '/people.csv', "name,city\nИван,Тула\nИгорь,Тула\nПётр,Тула\n");
+
+    $result = (new CsvQueryTool(new FileSandbox($dir)))->handle([
+        'path' => 'people.csv',
+        'where' => 'name~и',
+        'columns' => 'name',
+        'limit' => 2,
+    ]);
+
+    assertContains('2 из 3 строк', $result);
+    assertTrue(!str_contains($result, 'city'), 'лишняя колонка в выборке');
+});
+
+test('csv_query: неизвестная колонка — понятная ошибка', function (): void {
+    $dir = testDir();
+    file_put_contents($dir . '/people.csv', "name,city\nИван,Тула\n");
+
+    $result = (new CsvQueryTool(new FileSandbox($dir)))->handle([
+        'path' => 'people.csv',
+        'where' => 'город=Тула',
+    ]);
+
+    assertContains('Нет колонки', $result);
+    assertContains('name, city', $result);
+});
+
+// ---------------------------------------------------------------------------
+// Единицы и даты
+// ---------------------------------------------------------------------------
+
+test('convert_units: километры в мили', function (): void {
+    assertSame('100 km = 62.137119 mi', (new ConvertUnitsTool())->handle([
+        'value' => 100,
+        'from' => 'km',
+        'to' => 'mi',
+    ]));
+});
+
+test('convert_units: температура', function (): void {
+    $tool = new ConvertUnitsTool();
+
+    assertSame('0 c = 32 f', $tool->handle(['value' => 0, 'from' => 'c', 'to' => 'f']));
+    assertSame('100 c = 373.15 k', $tool->handle(['value' => 100, 'from' => 'c', 'to' => 'k']));
+});
+
+test('convert_units: русские названия единиц', function (): void {
+    // Ответ приходит в канонических кодах, независимо от ввода.
+    assertSame('5 km = 5000 m', (new ConvertUnitsTool())->handle([
+        'value' => 5,
+        'from' => 'км',
+        'to' => 'м',
+    ]));
+});
+
+test('convert_units: неизвестная единица', function (): void {
+    $result = (new ConvertUnitsTool())->handle(['value' => 1, 'from' => 'parsec', 'to' => 'm']);
+
+    assertContains('Не знаю единицы', $result);
+});
+
+test('date_calc: разница между датами', function (): void {
+    $result = (new DateCalcTool())->handle(['from' => '2026-01-01', 'to' => '2026-02-01']);
+
+    assertContains('31 день', $result);
+});
+
+test('date_calc: дата без времени — это полночь, а не «сейчас»', function (): void {
+    $result = (new DateCalcTool())->handle(['from' => '2026-01-01', 'modifier' => '+1 day']);
+
+    assertContains('2026-01-01 00:00:00', $result);
+    assertContains('2026-01-02 00:00:00', $result);
+});
+
+test('date_calc: прибавить интервал', function (): void {
+    $result = (new DateCalcTool())->handle(['from' => '2026-01-01', 'modifier' => '+30 days']);
+
+    assertContains('2026-01-31', $result);
+});
+
+test('date_calc: без параметров — подсказка', function (): void {
+    assertContains('Нужен либо to', (new DateCalcTool())->handle([]));
+});
+
+test('date_calc: плохой часовой пояс', function (): void {
+    assertContains('Неизвестный часовой пояс', (new DateCalcTool())->handle([
+        'from' => 'now',
+        'timezone' => 'Mars/Olympus',
+    ]));
+});
+
+// ---------------------------------------------------------------------------
+// UUID и хеши
+// ---------------------------------------------------------------------------
+
+test('uuid: формат v4 и уникальность', function (): void {
+    $tool = new UuidTool();
+    $first = $tool->handle([]);
+    $second = $tool->handle([]);
+
+    assertTrue(
+        preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/', $first) === 1,
+        'не UUID v4: ' . $first
+    );
+    assertTrue($first !== $second, 'два вызова вернули одинаковый UUID');
+});
+
+test('hash_text: известные значения', function (): void {
+    $tool = new HashTool();
+
+    assertSame('sha256: ' . hash('sha256', 'привет'), $tool->handle(['text' => 'привет']));
+    assertSame('md5: ' . md5('x'), $tool->handle(['text' => 'x', 'algo' => 'md5']));
+    assertContains('Неизвестный алгоритм', $tool->handle(['text' => 'x', 'algo' => 'crc32']));
+});
+
+// ---------------------------------------------------------------------------
+// http_get: защита от SSRF (без сети)
+// ---------------------------------------------------------------------------
+
+test('http_get: localhost запрещён', function (): void {
+    assertContains('локальному адресу', (new HttpGetTool())->handle(['url' => 'http://localhost/x']));
+});
+
+test('http_get: приватные адреса запрещены', function (): void {
+    $tool = new HttpGetTool();
+
+    assertContains('приватному адресу', $tool->handle(['url' => 'http://127.0.0.1/x']));
+    assertContains('приватному адресу', $tool->handle(['url' => 'http://10.0.0.5/x']));
+    assertContains('приватному адресу', $tool->handle(['url' => 'http://192.168.1.10/x']));
+});
+
+test('http_get: только http и https', function (): void {
+    assertContains('только http и https', (new HttpGetTool())->handle(['url' => 'ftp://example.com/x']));
+});
+
+// ---------------------------------------------------------------------------
+
+removeDir(__DIR__ . '/tmp');
 
 echo PHP_EOL . 'пройдено: ' . $passed . ', провалено: ' . $failed . PHP_EOL;
 
