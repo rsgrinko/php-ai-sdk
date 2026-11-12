@@ -66,7 +66,6 @@ php examples/01-chat.php
 | `09-files.php` | файлы и поиск | `read_file`, `list_dir`, `write_file`, `replace_in_file`, `search_files`, `find_files` | песочница, `create_dirs`, `all` |
 | `10-http.php` | HTTP без сети | `http_request` | `allowPrivate`, `auth`, методы |
 | `11-json.php` | инструменты без модели | `json_query`, `convert_units`, `date_calc`, `uuid`, `hash_text` | — |
-| `12-all-tools.php` | полный набор | все 18 | песочница, `allow`, `toolApproval`, `timeout` |
 
 `10-http.php` и `11-json.php` работают без модели и без сети — их можно запускать
 где угодно. Остальные обращаются к модели из `.env`.
@@ -118,7 +117,6 @@ examples/
   09-files.php         файлы и поиск
   10-http.php          HTTP: запрос, SSRF, allowPrivate
   11-json.php          инструменты без модели
-  12-all-tools.php     полный набор и все флаги
 tests/run.php          тесты без сети
 ```
 
