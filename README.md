@@ -84,6 +84,7 @@ examples/
   10-http.php          HTTP: запрос, SSRF, allowPrivate
   11-json.php          инструменты без модели
   12-logging.php       логирование запросов к модели
+  13-code-task.php     задача «с нуля»: код, тест, правка
 tests/run.php          раннер тестов
 tests/support.php      помощники, заглушки, FakeClient
 tests/cases/           тесты по темам (agent, files, http, shell, ...)
@@ -257,5 +258,6 @@ $agent->ask('вопрос');
 ---
 
 Лицензия: делайте что хотите.
+
 
 

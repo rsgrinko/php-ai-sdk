@@ -17,8 +17,10 @@
 | `10-http.php` | HTTP без сети | `http_request` | `allowPrivate`, `auth`, методы |
 | `11-json.php` | инструменты без модели | `json_query`, `convert_units`, `date_calc`, `uuid`, `hash_text` | — |
 | `12-logging.php` | логи запросов | `get_time`, `calculator` | `verbose`, `sink` |
+| `13-code-task.php` | агент пишет код и проверяет тестом | `read_file`, `write_file`, `replace_in_file`, `list_dir`, `run_command` | `workdir`, `allow`, `maxRounds` |
 
 `10-http.php` и `11-json.php` работают без модели и без сети — их можно запускать
 где угодно. Остальные обращаются к модели из `.env`.
+
 
 
