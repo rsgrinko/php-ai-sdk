@@ -69,6 +69,7 @@ final class Agent
         private readonly int $historyLimit = 40,
         private readonly ?\Closure $toolApproval = null,
         private readonly string $finishTool = 'finish',
+        private readonly ?AgentHooks $hooks = null,
     ) {
         $this->systemPrompt = $systemPrompt;
     }
@@ -79,6 +80,7 @@ final class Agent
     public static function fromEnv(
         ToolRegistry $tools = new ToolRegistry(),
         string $systemPrompt = self::DEFAULT_SYSTEM_PROMPT,
+        ?AgentHooks $hooks = null,
     ): self {
         return new self(
             client: AiClient::fromEnv(),
@@ -89,6 +91,7 @@ final class Agent
             parallelToolCalls: Env::bool('AI_PARALLEL_TOOL_CALLS', true),
             historyLimit: Env::int('AI_HISTORY_LIMIT', 40),
             finishTool: Env::get('AI_FINISH_TOOL', 'finish') ?? 'finish',
+            hooks: $hooks,
         );
     }
 
@@ -128,6 +131,8 @@ final class Agent
         // tool_choice применяется только к первому запросу хода: иначе
         // 'required' заставит модель звать инструменты в каждом раунде и она
         // никогда не сможет дать ответ.
+        $request = 1;
+        $this->fireStep($request);
         $result = $this->chat(true);
         $round = 0;
 
@@ -144,6 +149,13 @@ final class Agent
                 return $this->finish($finished);
             }
 
+            // Остановку проверяем между раундами: недоделанных вызовов нет,
+            // история остаётся валидной.
+            if ($this->hooks?->stopRequested() === true) {
+                return $this->finish('Остановлено пользователем.');
+            }
+
+            $this->fireStep(++$request);
             $result = $this->chat(false);
         }
 
@@ -155,11 +167,13 @@ final class Agent
             ];
 
             // Без инструментов и без tool_choice: иначе API может отвергнуть запрос.
+            $this->fireStep(++$request);
             $result = $this->send($this->messages, []);
         }
 
         $text = $result->text !== '' ? $result->text : '(модель вернула пустой ответ)';
         $this->messages[] = ['role' => 'assistant', 'content' => $text];
+        $this->hooks?->answer($text);
 
         return $text;
     }
@@ -216,6 +230,8 @@ final class Agent
         $started = microtime(true);
         $blocked = false;
 
+        $this->hooks?->toolStart($call['name'], $call['arguments']);
+
         if ($this->toolApproval !== null && !$this->approve($call['name'], $call['arguments'])) {
             $blocked = true;
             $output = 'Вызов инструмента "' . $call['name'] . '" отклонён оператором.';
@@ -230,6 +246,8 @@ final class Agent
             'ms' => (int) round((microtime(true) - $started) * 1000),
             'blocked' => $blocked,
         ];
+
+        $this->hooks?->toolEnd($this->trace[count($this->trace) - 1]);
 
         return [
             'role' => 'tool',
@@ -262,6 +280,7 @@ final class Agent
             }
 
             if ($this->isFinishCall($call)) {
+                $this->hooks?->toolStart($call['name'], $call['arguments']);
                 $finished = $this->finishResult($call);
 
                 $this->trace[] = [
@@ -271,6 +290,8 @@ final class Agent
                     'ms' => 0,
                     'blocked' => false,
                 ];
+
+                $this->hooks?->toolEnd($this->trace[count($this->trace) - 1]);
 
                 $this->messages[] = [
                     'role' => 'tool',
@@ -320,8 +341,14 @@ final class Agent
     {
         $text = $result !== '' ? $result : '(модель завершила работу без результата)';
         $this->messages[] = ['role' => 'assistant', 'content' => $text];
+        $this->hooks?->answer($text);
 
         return $text;
+    }
+
+    private function fireStep(int $step): void
+    {
+        $this->hooks?->step($step, $this->maxRounds);
     }
 
     /**

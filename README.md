@@ -43,6 +43,7 @@ src/
   ChatClient.php       интерфейс (для тестов)
   ChatResult.php       ответ модели: текст, tool_calls, usage
   Agent.php            цикл: вопрос → инструменты → ответ
+  AgentHooks.php       колбэки хода: шаг, инструмент, ответ, остановка
   LoggingClient.php    декоратор: логи запросов и ответов
   Cost.php             оценка стоимости по токенам и тарифу
   Tool.php             интерфейс инструмента
@@ -86,6 +87,7 @@ examples/
   11-json.php          инструменты без модели
   12-logging.php       логирование запросов к модели
   13-code-task.php     задача «с нуля»: код, тест, правка
+  14-hooks.php         прогресс в консоли и остановка через хуки
 tests/run.php          раннер тестов
 tests/support.php      помощники, заглушки, FakeClient
 tests/cases/           тесты по темам (agent, files, http, shell, ...)
@@ -259,6 +261,7 @@ $agent->ask('вопрос');
 ---
 
 Лицензия: делайте что хотите.
+
 
 
 

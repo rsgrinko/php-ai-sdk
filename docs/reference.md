@@ -82,6 +82,19 @@ $agent->setSystemPrompt('новый промпт'); // на ходу, истор
 $agent->systemPrompt();    // текущий промпт
 $agent->reset();
 
+// Хуки хода
+$agent = new Agent(
+    client: $client,
+    tools: $tools,
+    hooks: new AgentHooks(
+        onStep: fn (int $step, int $max) => print("шаг {$step}/{$max}\n"),
+        onToolStart: fn (string $name, array $args) => print("→ {$name}\n"),
+        onToolEnd: fn (array $s) => print('  ' . mb_substr($s['output'], 0, 60) . "\n"),
+        onAnswer: fn (string $text) => print("ответ: {$text}\n"),
+        shouldStop: fn (): bool => false,
+    ),
+);
+
 // Агент целиком из .env
 $agent = Agent::fromEnv($tools, 'Отвечай кратко.');
 
@@ -101,6 +114,7 @@ final class MyTool implements Tool {
 // Завершение: модель зовёт finish(result), Agent возвращает result
 $tools->add(new FinishTool());
 ```
+
 
 
 
