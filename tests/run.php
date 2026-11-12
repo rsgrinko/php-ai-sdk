@@ -74,7 +74,7 @@ function assertContains(string $needle, string $haystack, string $message = ''):
  */
 final class FakeClient implements ChatClient
 {
-    /** @var list<array{messages: array<int, mixed>, tools: array<int, mixed>}> */
+    /** @var list<array{messages: array<int, mixed>, tools: array<int, mixed>, options: array<string, mixed>}> */
     public array $requests = [];
 
     /**
@@ -84,9 +84,9 @@ final class FakeClient implements ChatClient
     {
     }
 
-    public function chat(array $messages, array $tools = []): ChatResult
+    public function chat(array $messages, array $tools = [], array $options = []): ChatResult
     {
-        $this->requests[] = ['messages' => $messages, 'tools' => $tools];
+        $this->requests[] = ['messages' => $messages, 'tools' => $tools, 'options' => $options];
 
         $result = array_shift($this->results);
 
@@ -349,6 +349,161 @@ test('агент: без явного промпта берётся встрое
     $agent = new Agent(new FakeClient([textResult('ок')]), new ToolRegistry());
 
     assertTrue($agent->systemPrompt() !== '', 'промпт по умолчанию пустой');
+});
+
+test('агент: tool_choice не навязывается на повторных раундах', function (): void {
+    $client = new FakeClient([
+        toolCall('calculator', ['expression' => '2+2'], 'c1'),
+        textResult('4'),
+    ]);
+
+    $agent = new Agent(
+        $client,
+        (new ToolRegistry())->add(new CalculatorTool()),
+        'тест',
+        3,
+        'required',
+    );
+
+    $agent->ask('посчитай');
+
+    assertSame('required', $client->requests[0]['options']['tool_choice'] ?? null);
+    assertTrue(
+        !isset($client->requests[1]['options']['tool_choice']),
+        'во втором раунде tool_choice должен вернуться к auto, иначе модель зациклится'
+    );
+});
+
+// ---------------------------------------------------------------------------
+// Настройки агента
+// ---------------------------------------------------------------------------
+
+test('настройки: tool_choice уходит в клиент', function (): void {
+    $client = new FakeClient([textResult('ок')]);
+    $agent = new Agent($client, new ToolRegistry(), 'тест', 3, 'required');
+
+    $agent->ask('вопрос');
+
+    assertSame('required', $client->requests[0]['options']['tool_choice'] ?? null);
+});
+
+test('настройки: tool_choice по умолчанию не навязывается', function (): void {
+    $client = new FakeClient([textResult('ок')]);
+    $agent = new Agent($client, new ToolRegistry(), 'тест', 3);
+
+    $agent->ask('вопрос');
+
+    assertTrue(!isset($client->requests[0]['options']['tool_choice']), 'auto не должен уходить явно');
+});
+
+test('настройки: parallel_tool_calls=false отправляется только когда выключено', function (): void {
+    $off = new FakeClient([textResult('ок')]);
+    (new Agent($off, new ToolRegistry(), 'тест', 3, 'auto', false))->ask('вопрос');
+
+    assertSame(false, $off->requests[0]['options']['parallel_tool_calls']);
+
+    $on = new FakeClient([textResult('ок')]);
+    (new Agent($on, new ToolRegistry(), 'тест', 3, 'auto', true))->ask('вопрос');
+
+    assertTrue(!isset($on->requests[0]['options']['parallel_tool_calls']), 'true — это значение по умолчанию');
+});
+
+test('настройки: хук может запретить вызов инструмента', function (): void {
+    $client = new FakeClient([
+        toolCall('calculator', ['expression' => '2+2'], 'c1'),
+        textResult('Не смог: действие запрещено.'),
+    ]);
+
+    $agent = new Agent(
+        $client,
+        (new ToolRegistry())->add(new CalculatorTool()),
+        'тест',
+        3,
+        'auto',
+        true,
+        40,
+        static fn (string $name, array $args): bool => false,
+    );
+
+    $agent->ask('посчитай');
+
+    assertTrue($agent->trace()[0]['blocked'], 'вызов должен быть помечен как отклонённый');
+    assertContains('отклонён оператором', $agent->trace()[0]['output']);
+
+    $messages = $client->requests[1]['messages'];
+    $last = $messages[count($messages) - 1];
+    assertContains('отклонён оператором', $last['content']);
+});
+
+test('настройки: хук пропускает разрешённый вызов', function (): void {
+    $client = new FakeClient([
+        toolCall('calculator', ['expression' => '2+2'], 'c1'),
+        textResult('4'),
+    ]);
+
+    $seen = null;
+    $agent = new Agent(
+        $client,
+        (new ToolRegistry())->add(new CalculatorTool()),
+        'тест',
+        3,
+        'auto',
+        true,
+        40,
+        static function (string $name, array $args) use (&$seen): bool {
+            $seen = [$name, $args];
+
+            return true;
+        },
+    );
+
+    $agent->ask('посчитай');
+
+    assertSame('calculator', $seen[0]);
+    assertSame('2+2', $seen[1]['expression']);
+    assertSame(false, $agent->trace()[0]['blocked']);
+    assertSame('2+2 = 4', $agent->trace()[0]['output']);
+});
+
+test('настройки: historyLimit обрезает историю целыми ходами', function (): void {
+    $client = new FakeClient([
+        textResult('a1'),
+        textResult('a2'),
+        textResult('a3'),
+        textResult('a4'),
+    ]);
+
+    $agent = new Agent($client, new ToolRegistry(), 'тест', 3, 'auto', true, 4);
+
+    $agent->ask('вопрос 1');
+    $agent->ask('вопрос 2');
+    $agent->ask('вопрос 3');
+    $agent->ask('вопрос 4');
+
+    $messages = $agent->messages();
+
+    assertSame('system', $messages[0]['role'], 'system должен оставаться первым');
+    assertTrue(($messages[1]['role'] ?? '') !== 'tool', 'история не должна начинаться с tool');
+
+    // Обрезка идёт Перед запросом: лимит 4 + system + финальный ответ.
+    assertSame(6, count($messages), 'без лимита было бы 9');
+
+    $last = $messages[count($messages) - 1];
+    $question = $messages[count($messages) - 2];
+
+    assertSame('user', $question['role']);
+    assertSame('вопрос 4', $question['content'], 'текущий вопрос должен сохраниться');
+    assertSame('assistant', $last['role']);
+});
+
+test('настройки: historyLimit=0 отключает обрезку', function (): void {
+    $client = new FakeClient([textResult('a'), textResult('b')]);
+    $agent = new Agent($client, new ToolRegistry(), 'тест', 3, 'auto', true, 0);
+
+    $agent->ask('раз');
+    $agent->ask('два');
+
+    assertSame(5, count($agent->messages()), 'system + 2 вопроса + 2 ответа');
 });
 
 test('агент: reset очищает историю и трассировку', function (): void {

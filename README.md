@@ -69,6 +69,7 @@ examples/
   02-tools.php         агент с тремя инструментами
   03-custom-tool.php   свой инструмент с нуля
   04-cli.php           интерактивный чат в терминале
+  05-settings.php      tool_choice, подтверждение вызовов, история
 tests/run.php          тесты без сети
 ```
 
@@ -97,6 +98,45 @@ messages += {role: tool, tool_call_id, content}
 
 Ошибки инструментов не ломают диалог: `ToolRegistry` превращает исключение в
 текст, модель видит `Ошибка инструмента "x": ...` и может исправиться.
+
+## Настройки агента
+
+Все параметры — именованными аргументами конструктора, defaults безопасные:
+
+```php
+$agent = new Agent(
+    client: AiClient::fromEnv(),
+    tools: $tools,
+    systemPrompt: 'Отвечай кратко.',
+    maxRounds: 5,             // предохранитель от зацикливания
+    toolChoice: 'auto',       // auto | none | required | имя инструмента
+    parallelToolCalls: true,  // разрешить модели батчить вызовы
+    historyLimit: 40,         // сообщений истории (0 — без лимита)
+    toolApproval: fn (string $name, array $args): bool => $name !== 'get_time',
+);
+```
+
+| Параметр | `.env` | Что делает |
+|---|---|---|
+| `maxRounds` | `AI_MAX_ROUNDS` | сколько раундов «инструменты → модель» до принудительного ответа |
+| `toolChoice` | `AI_TOOL_CHOICE` | `required` заставит вызвать инструмент, `none` запретит, имя — конкретный |
+| `parallelToolCalls` | `AI_PARALLEL_TOOL_CALLS` | `false` — вызовы пойдут по одному |
+| `historyLimit` | `AI_HISTORY_LIMIT` | обрезка старых ходов; `system` и текущий вопрос остаются |
+| `toolApproval` | — | колбэк-подтверждение: `false` запрещает вызов, модель получает отказ |
+
+Два нюанса, которые важно знать:
+
+- **`toolChoice` действует только на первый запрос хода.** Иначе `required`
+  заставит модель звать инструменты в каждом раунде, и она никогда не ответит.
+  Дальше всегда `auto`.
+- **`toolApproval` — не песочница.** Это удобный хук для «спросить человека» и
+  для логов. Настоящая защита — не давать инструменту опасных прав вообще.
+
+Агент целиком из `.env`:
+
+```php
+$agent = Agent::fromEnv($tools, 'Отвечай кратко.');
+```
 
 ## Свой инструмент
 
@@ -192,7 +232,8 @@ curl http://10.10.10.77:8080/v1/models
 php tests/run.php
 ```
 
-18 проверок: калькулятор, время, реестр, обрезка результатов, весь цикл агента
+26 проверок: калькулятор, время, реестр, обрезка результатов, весь цикл агента,
+настройки (tool_choice, подтверждение вызовов, история)
 (успех, ошибка инструмента, лимит раундов, история). Сеть не нужна — модель
 подменяется `FakeClient` из `tests/run.php`.
 
@@ -217,10 +258,10 @@ final class LoggingClient implements ChatClient
 {
     public function __construct(private ChatClient $inner) {}
 
-    public function chat(array $messages, array $tools = []): ChatResult
+    public function chat(array $messages, array $tools = [], array $options = []): ChatResult
     {
         $started = microtime(true);
-        $result = $this->inner->chat($messages, $tools);
+        $result = $this->inner->chat($messages, $tools, $options);
         error_log(sprintf('LLM: %d мс, токенов %d', (microtime(true) - $started) * 1000, $result->usage['total_tokens'] ?? 0));
 
         return $result;
@@ -246,17 +287,30 @@ $agent = new Agent(new LoggingClient(AiClient::fromEnv()), $tools);
 ```php
 // Клиент
 $client = AiClient::fromEnv();
-$result = $client->chat($messages, $tools = []);
+$result = $client->chat($messages, $tools = [], $options = []);
+// options: tool_choice, parallel_tool_calls, temperature, max_tokens
 $result->text; $result->toolCalls; $result->usage;
 
 // Агент
-$agent = new Agent($client, $tools, $systemPrompt = '...', $maxRounds = 5);
+$agent = new Agent(
+    client: $client,
+    tools: $tools,
+    systemPrompt: '...',
+    maxRounds: 5,
+    toolChoice: 'auto',          // auto | none | required | имя
+    parallelToolCalls: true,
+    historyLimit: 40,            // 0 — без обрезки
+    toolApproval: fn ($name, $args): bool => true,
+);
 $agent->ask('вопрос');     // string
-$agent->trace();           // [{name, arguments, output, ms}]
+$agent->trace();           // [{name, arguments, output, ms, blocked}]
 $agent->messages();        // вся история
 $agent->setSystemPrompt('новый промпт'); // на ходу, история сохраняется
 $agent->systemPrompt();    // текущий промпт
 $agent->reset();
+
+// Агент целиком из .env
+$agent = Agent::fromEnv($tools, 'Отвечай кратко.');
 
 // Реестр
 $registry = (new ToolRegistry($maxResultChars = 4000))->add($tool1, $tool2);

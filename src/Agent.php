@@ -15,6 +15,19 @@ use AiSdk\Tools\TimeTool;
  *
  * Внутри: отправили вопрос -> модель попросила инструменты -> выполнили ->
  * отправили результаты -> получили ответ. И так до maxRounds.
+ *
+ * Настройки — именованными аргументами конструктора:
+ *
+ *   new Agent(
+ *       client: $client,
+ *       tools: $tools,
+ *       systemPrompt: '...',
+ *       maxRounds: 5,              // предохранитель от зацикливания
+ *       toolChoice: 'auto',        // auto | none | required | имя инструмента
+ *       parallelToolCalls: true,   // разрешить модели батчить вызовы
+ *       historyLimit: 40,          // сколько сообщений держать (0 — без лимита)
+ *       toolApproval: fn ($name, $args) => $name !== 'drop_database',
+ *   );
  */
 final class Agent
 {
@@ -27,18 +40,52 @@ final class Agent
     /** @var list<array<string, mixed>> */
     private array $messages = [];
 
-    /** @var list<array{name: string, arguments: array<string, mixed>, output: string, ms: int}> */
+    /** @var list<array{name: string, arguments: array<string, mixed>, output: string, ms: int, blocked: bool}> */
     private array $trace = [];
 
     private string $systemPrompt;
 
+    /**
+     * @param string $toolChoice 'auto' — решает модель, 'none' — запретить вызов,
+     *                           'required' — обязать вызвать хоть что-то,
+     *                           иначе считается именем конкретного инструмента.
+     * @param bool $parallelToolCalls если false, отправляется
+     *                                parallel_tool_calls=false и модель не батчит вызовы.
+     * @param int $historyLimit максимум сообщений в истории перед вопросом
+     *                          (0 — не обрезать). System и текущий вопрос сохраняются.
+     * @param (\Closure(string, array<string, mixed>): bool)|null $toolApproval
+     *        хук перед выполнением инструмента. Вернул false — вызов запрещён,
+     *        модель получит текст отказа. Удобно для подтверждения опасных действий.
+     */
     public function __construct(
         private readonly ChatClient $client,
         private readonly ToolRegistry $tools = new ToolRegistry(),
         string $systemPrompt = self::DEFAULT_SYSTEM_PROMPT,
         private readonly int $maxRounds = 5,
+        private readonly string $toolChoice = 'auto',
+        private readonly bool $parallelToolCalls = true,
+        private readonly int $historyLimit = 40,
+        private readonly ?\Closure $toolApproval = null,
     ) {
         $this->systemPrompt = $systemPrompt;
+    }
+
+    /**
+     * Агент из настроек .env (AI_*), с переданными инструментами.
+     */
+    public static function fromEnv(
+        ToolRegistry $tools = new ToolRegistry(),
+        string $systemPrompt = self::DEFAULT_SYSTEM_PROMPT,
+    ): self {
+        return new self(
+            client: AiClient::fromEnv(),
+            tools: $tools,
+            systemPrompt: $systemPrompt,
+            maxRounds: Env::int('AI_MAX_ROUNDS', 5),
+            toolChoice: Env::get('AI_TOOL_CHOICE', 'auto') ?? 'auto',
+            parallelToolCalls: Env::bool('AI_PARALLEL_TOOL_CALLS', true),
+            historyLimit: Env::int('AI_HISTORY_LIMIT', 40),
+        );
     }
 
     /**
@@ -72,8 +119,12 @@ final class Agent
         }
 
         $this->messages[] = ['role' => 'user', 'content' => $question];
+        $this->trimHistory();
 
-        $result = $this->chat();
+        // tool_choice применяется только к первому запросу хода: иначе
+        // 'required' заставит модель звать инструменты в каждом раунде и она
+        // никогда не сможет дать ответ.
+        $result = $this->chat(true);
         $round = 0;
 
         while ($result->hasToolCalls() && $round < $this->maxRounds) {
@@ -84,24 +135,10 @@ final class Agent
             $this->messages[] = $result->assistantMessage;
 
             foreach ($result->toolCalls as $call) {
-                $started = microtime(true);
-                $output = $this->tools->execute($call['name'], $call['arguments']);
-
-                $this->trace[] = [
-                    'name' => $call['name'],
-                    'arguments' => $call['arguments'],
-                    'output' => $output,
-                    'ms' => (int) round((microtime(true) - $started) * 1000),
-                ];
-
-                $this->messages[] = [
-                    'role' => 'tool',
-                    'tool_call_id' => $call['id'],
-                    'content' => $output,
-                ];
+                $this->messages[] = $this->runTool($call);
             }
 
-            $result = $this->chat();
+            $result = $this->chat(false);
         }
 
         // Модель зациклилась на инструментах — просим ответить без них.
@@ -111,6 +148,7 @@ final class Agent
                 'content' => 'Лимит вызовов инструментов исчерпан. Ответь на вопрос без инструментов.',
             ];
 
+            // Без инструментов и без tool_choice: иначе API может отвергнуть запрос.
             $result = $this->client->chat($this->messages, []);
         }
 
@@ -131,9 +169,9 @@ final class Agent
     }
 
     /**
-     * Что реально вызывалось: имя, аргументы, результат, время.
+     * Что реально вызывалось: имя, аргументы, результат, время, был ли отказ.
      *
-     * @return list<array{name: string, arguments: array<string, mixed>, output: string, ms: int}>
+     * @return list<array{name: string, arguments: array<string, mixed>, output: string, ms: int, blocked: bool}>
      */
     public function trace(): array
     {
@@ -149,9 +187,133 @@ final class Agent
         $this->trace = [];
     }
 
-    private function chat(): ChatResult
+    /**
+     * Выполнить один вызов инструмента (с учётом хука подтверждения)
+     * и вернуть tool-сообщение для истории.
+     *
+     * @param array{id: string, name: string, arguments: array<string, mixed>} $call
+     * @return array<string, mixed>
+     */
+    private function runTool(array $call): array
     {
-        return $this->client->chat($this->messages, $this->tools->definitions());
+        $started = microtime(true);
+        $blocked = false;
+
+        if ($this->toolApproval !== null && !$this->approve($call['name'], $call['arguments'])) {
+            $blocked = true;
+            $output = 'Вызов инструмента "' . $call['name'] . '" отклонён оператором.';
+        } else {
+            $output = $this->tools->execute($call['name'], $call['arguments']);
+        }
+
+        $this->trace[] = [
+            'name' => $call['name'],
+            'arguments' => $call['arguments'],
+            'output' => $output,
+            'ms' => (int) round((microtime(true) - $started) * 1000),
+            'blocked' => $blocked,
+        ];
+
+        return [
+            'role' => 'tool',
+            'tool_call_id' => $call['id'],
+            'content' => $output,
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $arguments
+     */
+    private function approve(string $name, array $arguments): bool
+    {
+        try {
+            return $this->toolApproval === null
+                || ($this->toolApproval)($name, $arguments) === true;
+        } catch (\Throwable) {
+            // Упавший хук считаем запретом: безопаснее не выполнять действие.
+            return false;
+        }
+    }
+
+    /**
+     * Обрезать историю до historyLimit сообщений.
+     *
+     * Режем целыми ходами: system и текущий вопрос остаются, а «осиротевшие»
+     * tool-сообщения в начале недопустимы — API отвергнет такой запрос.
+     */
+    private function trimHistory(): void
+    {
+        if ($this->historyLimit <= 0) {
+            return;
+        }
+
+        $count = count($this->messages);
+
+        if ($count <= $this->historyLimit) {
+            return;
+        }
+
+        $keepFrom = $count - $this->historyLimit;
+
+        // Нельзя начинать с role:tool — у результата не будет своего вызова.
+        while ($keepFrom < $count && ($this->messages[$keepFrom]['role'] ?? '') === 'tool') {
+            $keepFrom++;
+        }
+
+        // Текущий вопрос (последний user) трогать нельзя.
+        $lastUser = 0;
+
+        foreach ($this->messages as $index => $message) {
+            if (($message['role'] ?? '') === 'user') {
+                $lastUser = $index;
+            }
+        }
+
+        if ($keepFrom > $lastUser) {
+            $keepFrom = $lastUser;
+        }
+
+        if ($keepFrom <= 0) {
+            return;
+        }
+
+        $head = [];
+
+        if (($this->messages[0]['role'] ?? '') === 'system') {
+            $head[] = $this->messages[0];
+        }
+
+        $this->messages = array_merge($head, array_slice($this->messages, $keepFrom));
+    }
+
+    /**
+     * @param bool $withToolChoice применять ли tool_choice (только первый
+     *                             запрос хода, дальше — auto)
+     * @return array<string, mixed>
+     */
+    private function chatOptions(bool $withToolChoice): array
+    {
+        $options = [];
+
+        if ($withToolChoice && $this->toolChoice !== '' && $this->toolChoice !== 'auto') {
+            $options['tool_choice'] = $this->toolChoice;
+        }
+
+        // Значение по умолчанию у провайдеров и так true — шлём только false.
+        if (!$this->parallelToolCalls) {
+            $options['parallel_tool_calls'] = false;
+        }
+
+        return $options;
+    }
+
+    private function chat(bool $withToolChoice = false): ChatResult
+    {
+        return $this->client->chat(
+            $this->messages,
+            $this->tools->definitions(),
+            $this->chatOptions($withToolChoice),
+        );
     }
 
     /**

@@ -59,19 +59,23 @@ final class AiClient implements ChatClient
         );
     }
 
-    public function chat(array $messages, array $tools = []): ChatResult
+    public function chat(array $messages, array $tools = [], array $options = []): ChatResult
     {
         $body = [
             'model' => $this->model,
             'messages' => $messages,
             'stream' => false,
-            'temperature' => $this->temperature,
-            'max_tokens' => $this->maxTokens,
+            'temperature' => isset($options['temperature']) ? (float) $options['temperature'] : $this->temperature,
+            'max_tokens' => isset($options['max_tokens']) ? (int) $options['max_tokens'] : $this->maxTokens,
         ];
 
         if ($tools !== []) {
             $body['tools'] = $tools;
-            $body['tool_choice'] = 'auto';
+            $body['tool_choice'] = self::normalizeToolChoice($options['tool_choice'] ?? 'auto');
+
+            if (array_key_exists('parallel_tool_calls', $options)) {
+                $body['parallel_tool_calls'] = (bool) $options['parallel_tool_calls'];
+            }
         }
 
         $body = array_merge($body, $this->extraBody);
@@ -158,6 +162,26 @@ final class AiClient implements ChatClient
         }
 
         return $calls;
+    }
+
+    /**
+     * Привести tool_choice к формату OpenAI.
+     *
+     * @param string|array<string, mixed> $choice
+     * @return string|array<string, mixed>
+     */
+    private static function normalizeToolChoice(string|array $choice): string|array
+    {
+        if (is_array($choice)) {
+            return $choice;
+        }
+
+        if (in_array($choice, ['auto', 'none', 'required'], true)) {
+            return $choice;
+        }
+
+        // Имя конкретного инструмента -> объект.
+        return ['type' => 'function', 'function' => ['name' => $choice]];
     }
 
     /**
