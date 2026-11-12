@@ -101,81 +101,119 @@ final class ShellTool implements Tool
             return 'Рабочий каталог недоступен: ' . (string) ($this->workdir ?? '');
         }
 
-        // Вывод пишем в файлы, а не в пайпы: на Windows неблокирующее чтение
-        // пайпов не работает, и цикл ожидания съедал весь таймаут.
-        if (!is_dir($this->tmpDir) && !@mkdir($this->tmpDir, 0777, true) && !is_dir($this->tmpDir)) {
-            return 'Не удалось создать каталог для временных файлов: ' . $this->tmpDir;
-        }
+        $files = $this->tempFiles();
 
-        $outFile = @tempnam($this->tmpDir, 'aisdk_out_');
-        $errFile = @tempnam($this->tmpDir, 'aisdk_err_');
-
-        if ($outFile === false || $errFile === false) {
+        if ($files === null) {
             return 'Не удалось создать временные файлы для вывода в ' . $this->tmpDir . '.';
         }
 
+        [$outFile, $errFile] = $files;
+
         try {
-            $process = @proc_open($commandLine, [
-                0 => ['pipe', 'r'],
-                1 => ['file', $outFile, 'w'],
-                2 => ['file', $errFile, 'w'],
-            ], $pipes, $cwd);
-
-            if (!is_resource($process)) {
-                return 'Не удалось запустить команду.';
-            }
-
-            // Stdin сразу закрываем: иначе ждущая ввода команда повиснет.
-            @fclose($pipes[0]);
-
-            $timedOut = false;
-            $overflow = false;
-            $exitCode = null;
-            $startedAt = microtime(true);
-            $diskLimit = $this->maxOutput * 4;
-
-            while (true) {
-                $status = proc_get_status($process);
-
-                if (!$status['running']) {
-                    $exitCode = (int) $status['exitcode'];
-                    break;
-                }
-
-                if ((microtime(true) - $startedAt) > $this->timeout) {
-                    $timedOut = true;
-                    @proc_terminate($process, 9);
-                    $this->killTree((int) $status['pid']);
-                    break;
-                }
-
-                // Команда пишет без остановки — не даём забить диск.
-                $written = (@filesize($outFile) ?: 0) + (@filesize($errFile) ?: 0);
-
-                if ($written > $diskLimit) {
-                    $overflow = true;
-                    @proc_terminate($process, 9);
-                    $this->killTree((int) $status['pid']);
-                    break;
-                }
-
-                usleep(10_000);
-            }
-
-            $closeCode = @proc_close($process);
-
-            if ($exitCode === null || $exitCode < 0) {
-                $exitCode = $closeCode;
-            }
-
+            $run = $this->run($commandLine, $cwd, $outFile, $errFile);
+        } catch (\RuntimeException $e) {
+            return $e->getMessage();
+        } finally {
             $stdout = (string) @file_get_contents($outFile);
             $stderr = (string) @file_get_contents($errFile);
-        } finally {
             @unlink($outFile);
             @unlink($errFile);
         }
 
-        return $this->format($command, $stdout, $stderr, $timedOut, $overflow, $exitCode);
+        return $this->format($command, $stdout, $stderr, $run['timedOut'], $run['overflow'], $run['exitCode']);
+    }
+
+    /**
+     * Вывод пишем в файлы, а не в пайпы: на Windows неблокирующее чтение
+     * пайпов не работает, и цикл ожидания съедал весь таймаут.
+     *
+     * @return array{0: string, 1: string}|null пути stdout и stderr
+     */
+    private function tempFiles(): ?array
+    {
+        if (!is_dir($this->tmpDir) && !@mkdir($this->tmpDir, 0777, true) && !is_dir($this->tmpDir)) {
+            return null;
+        }
+
+        $out = @tempnam($this->tmpDir, 'aisdk_out_');
+        $err = @tempnam($this->tmpDir, 'aisdk_err_');
+
+        if ($out === false || $err === false) {
+            if ($out !== false) {
+                @unlink($out);
+            }
+
+            if ($err !== false) {
+                @unlink($err);
+            }
+
+            return null;
+        }
+
+        return [$out, $err];
+    }
+
+    /**
+     * Запустить процесс и дождаться завершения.
+     *
+     * @return array{timedOut: bool, overflow: bool, exitCode: int}
+     */
+    private function run(string $commandLine, string $cwd, string $outFile, string $errFile): array
+    {
+        $process = @proc_open($commandLine, [
+            0 => ['pipe', 'r'],
+            1 => ['file', $outFile, 'w'],
+            2 => ['file', $errFile, 'w'],
+        ], $pipes, $cwd);
+
+        if (!is_resource($process)) {
+            throw new \RuntimeException('Не удалось запустить команду.');
+        }
+
+        // Stdin сразу закрываем: иначе ждущая ввода команда повиснет.
+        @fclose($pipes[0]);
+
+        $timedOut = false;
+        $overflow = false;
+        $exitCode = null;
+        $startedAt = microtime(true);
+        $diskLimit = $this->maxOutput * 4;
+
+        while (true) {
+            $status = proc_get_status($process);
+
+            if (!$status['running']) {
+                $exitCode = (int) $status['exitcode'];
+                break;
+            }
+
+            if ((microtime(true) - $startedAt) > $this->timeout) {
+                $timedOut = true;
+                @proc_terminate($process, 9);
+                $this->killTree((int) $status['pid']);
+                break;
+            }
+
+            // Команда пишет без остановки — не даём забить диск.
+            $written = (@filesize($outFile) ?: 0) + (@filesize($errFile) ?: 0);
+
+            if ($written > $diskLimit) {
+                $overflow = true;
+                @proc_terminate($process, 9);
+                $this->killTree((int) $status['pid']);
+                break;
+            }
+
+            usleep(10_000);
+        }
+
+        $closeCode = @proc_close($process);
+
+        if ($exitCode === null || $exitCode < 0) {
+            $exitCode = $closeCode;
+        }
+
+        return ['timedOut' => $timedOut, 'overflow' => $overflow, 'exitCode' => $exitCode];
     }
 
     /**

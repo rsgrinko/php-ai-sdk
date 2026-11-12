@@ -4,32 +4,10 @@ declare(strict_types=1);
 
 // Тесты: http. Запускаются из tests/run.php.
 
-use AiSdk\Agent;
-use AiSdk\ChatClient;
-use AiSdk\ChatResult;
 use AiSdk\HttpTransport;
 use AiSdk\HttpRequest;
-use AiSdk\LoggingClient;
 use AiSdk\Tool;
-use AiSdk\ToolRegistry;
-use AiSdk\Tools\CalculatorTool;
-use AiSdk\Tools\ConvertUnitsTool;
-use AiSdk\Tools\CsvQueryTool;
-use AiSdk\Tools\DateCalcTool;
-use AiSdk\Tools\FileSandbox;
-use AiSdk\Tools\FindFilesTool;
-use AiSdk\Tools\JsonQueryTool;
-use AiSdk\Tools\FinishTool;
-use AiSdk\Tools\HashTool;
 use AiSdk\Tools\HttpRequestTool;
-use AiSdk\Tools\ListDirTool;
-use AiSdk\Tools\ReadFileTool;
-use AiSdk\Tools\ReplaceInFileTool;
-use AiSdk\Tools\SearchFilesTool;
-use AiSdk\Tools\ShellTool;
-use AiSdk\Tools\TimeTool;
-use AiSdk\Tools\WriteFileTool;
-use AiSdk\Tools\UuidTool;
 
 // ---------------------------------------------------------------------------
 // http_request: сборка запроса (без сети)
@@ -109,7 +87,6 @@ test('http: заголовки превращаются в строки cURL', f
     assertSame(['Accept: */*'], HttpTransport::headerLines([]));
     assertSame(['Accept: */*'], HttpTransport::headerLines(['Accept: */*']));
 });
-
 
 // ---------------------------------------------------------------------------
 // http_request: защита от SSRF (без сети)

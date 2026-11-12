@@ -111,15 +111,46 @@ final class CsvQueryTool implements Tool
             return $filter;
         }
 
-        $allRows = [];
-
-        while (($row = fgetcsv($handle, 0, $delimiter)) !== false) {
-            $allRows[] = array_map(static fn ($cell): string => trim((string) $cell), $row);
-        }
-
+        $allRows = $this->readRows($handle, $delimiter);
         fclose($handle);
 
         $total = count($allRows);
+        $rows = $this->pickRows($allRows, $header, $requested, $filter, $limit);
+
+        if ($rows === []) {
+            return 'Подходящих строк нет (всего строк: ' . $total . ').';
+        }
+
+        $table = [array_map(static fn (int $i): string => $header[$i], $requested)];
+        $table = array_merge($table, $rows);
+
+        return 'CSV ' . $path . ': ' . count($rows) . ' из ' . $total . " строк\n" . $this->render($table);
+    }
+
+    /**
+     * @param resource $handle
+     * @return list<list<string>>
+     */
+    private function readRows($handle, string $delimiter): array
+    {
+        $rows = [];
+
+        while (($row = fgetcsv($handle, 0, $delimiter)) !== false) {
+            $rows[] = array_map(static fn ($cell): string => trim((string) $cell), $row);
+        }
+
+        return $rows;
+    }
+
+    /**
+     * @param list<list<string>> $allRows
+     * @param list<string> $header
+     * @param list<int> $requested
+     * @param array{index: int, value: string, contains: bool}|null $filter
+     * @return list<list<string>>
+     */
+    private function pickRows(array $allRows, array $header, array $requested, ?array $filter, int $limit): array
+    {
         $rows = [];
 
         foreach ($allRows as $row) {
@@ -140,16 +171,8 @@ final class CsvQueryTool implements Tool
             }
         }
 
-        if ($rows === []) {
-            return 'Подходящих строк нет (всего строк: ' . $total . ').';
-        }
-
-        $table = [array_map(static fn (int $i): string => $header[$i], $requested)];
-        $table = array_merge($table, $rows);
-
-        return 'CSV ' . $path . ': ' . count($rows) . ' из ' . $total . " строк\n" . $this->render($table);
+        return $rows;
     }
-
     /**
      * @param list<string> $header
      * @return list<int>|string индексы колонок или текст ошибки
@@ -266,3 +289,4 @@ final class CsvQueryTool implements Tool
         return implode("\n", $lines);
     }
 }
+

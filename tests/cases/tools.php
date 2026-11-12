@@ -4,31 +4,14 @@ declare(strict_types=1);
 
 // Тесты: tools. Запускаются из tests/run.php.
 
-use AiSdk\Agent;
-use AiSdk\ChatClient;
-use AiSdk\ChatResult;
-use AiSdk\HttpTransport;
-use AiSdk\HttpRequest;
-use AiSdk\LoggingClient;
 use AiSdk\Tool;
 use AiSdk\ToolRegistry;
 use AiSdk\Tools\CalculatorTool;
 use AiSdk\Tools\ConvertUnitsTool;
-use AiSdk\Tools\CsvQueryTool;
 use AiSdk\Tools\DateCalcTool;
-use AiSdk\Tools\FileSandbox;
-use AiSdk\Tools\FindFilesTool;
 use AiSdk\Tools\JsonQueryTool;
-use AiSdk\Tools\FinishTool;
 use AiSdk\Tools\HashTool;
-use AiSdk\Tools\HttpRequestTool;
-use AiSdk\Tools\ListDirTool;
-use AiSdk\Tools\ReadFileTool;
-use AiSdk\Tools\ReplaceInFileTool;
-use AiSdk\Tools\SearchFilesTool;
-use AiSdk\Tools\ShellTool;
 use AiSdk\Tools\TimeTool;
-use AiSdk\Tools\WriteFileTool;
 use AiSdk\Tools\UuidTool;
 
 // ---------------------------------------------------------------------------
@@ -67,7 +50,6 @@ test('time: возвращает дату в нужном поясе', function 
 test('time: неизвестный пояс — понятная ошибка', function (): void {
     assertContains('Неизвестный часовой пояс', (new TimeTool())->handle(['timezone' => 'Mars/Olympus']));
 });
-
 
 // ---------------------------------------------------------------------------
 // Реестр инструментов
@@ -145,7 +127,6 @@ test('реестр: длинный результат обрезается', fun
     assertSame(11, mb_strlen($result), 'ожидалось 10 символов и многоточие');
 });
 
-
 // ---------------------------------------------------------------------------
 // Единицы и даты
 // ---------------------------------------------------------------------------
@@ -210,7 +191,6 @@ test('date_calc: плохой часовой пояс', function (): void {
     ]));
 });
 
-
 // ---------------------------------------------------------------------------
 // UUID и хеши
 // ---------------------------------------------------------------------------
@@ -234,7 +214,6 @@ test('hash_text: известные значения', function (): void {
     assertSame('md5: ' . md5('x'), $tool->handle(['text' => 'x', 'algo' => 'md5']));
     assertContains('Неизвестный алгоритм', $tool->handle(['text' => 'x', 'algo' => 'crc32']));
 });
-
 
 // ---------------------------------------------------------------------------
 // JSON

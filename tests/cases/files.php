@@ -4,32 +4,14 @@ declare(strict_types=1);
 
 // Тесты: files. Запускаются из tests/run.php.
 
-use AiSdk\Agent;
-use AiSdk\ChatClient;
-use AiSdk\ChatResult;
-use AiSdk\HttpTransport;
-use AiSdk\HttpRequest;
-use AiSdk\LoggingClient;
-use AiSdk\Tool;
-use AiSdk\ToolRegistry;
-use AiSdk\Tools\CalculatorTool;
-use AiSdk\Tools\ConvertUnitsTool;
 use AiSdk\Tools\CsvQueryTool;
-use AiSdk\Tools\DateCalcTool;
 use AiSdk\Tools\FileSandbox;
 use AiSdk\Tools\FindFilesTool;
-use AiSdk\Tools\JsonQueryTool;
-use AiSdk\Tools\FinishTool;
-use AiSdk\Tools\HashTool;
-use AiSdk\Tools\HttpRequestTool;
 use AiSdk\Tools\ListDirTool;
 use AiSdk\Tools\ReadFileTool;
 use AiSdk\Tools\ReplaceInFileTool;
 use AiSdk\Tools\SearchFilesTool;
-use AiSdk\Tools\ShellTool;
-use AiSdk\Tools\TimeTool;
 use AiSdk\Tools\WriteFileTool;
-use AiSdk\Tools\UuidTool;
 
 // ---------------------------------------------------------------------------
 // Файлы
@@ -101,7 +83,6 @@ test('list_dir: выход за корень запрещён', function (): voi
     assertContains('не должен содержать', $result);
 });
 
-
 // ---------------------------------------------------------------------------
 // CSV
 // ---------------------------------------------------------------------------
@@ -151,7 +132,6 @@ test('csv_query: неизвестная колонка — понятная ош
     assertContains('Нет колонки', $result);
     assertContains('name, city', $result);
 });
-
 
 // ---------------------------------------------------------------------------
 // Запись и правка файлов
@@ -260,7 +240,6 @@ test('replace_in_file: не найдено — понятная ошибка', f
     assertContains('не найден', $result);
 });
 
-
 // ---------------------------------------------------------------------------
 // Поиск по файлам
 // ---------------------------------------------------------------------------
@@ -320,7 +299,6 @@ test('find_files: поиск по маске', function (): void {
     assertContains('a.php', $result);
     assertTrue(!str_contains($result, 'b.txt'), 'лишний файл в выдаче');
 });
-
 
 // ---------------------------------------------------------------------------
 // Песочница: ограниченный и свободный режимы

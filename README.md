@@ -1,18 +1,3 @@
-# AI SDK — минимальная основа для чата с инструментами
-
-Крошечная PHP-библиотека без зависимостей: диалог с любой OpenAI-совместимой
-моделью и **function calling** (вызов инструментов).
-
-```php
-$agent = new Agent(AiClient::fromEnv(), $tools);
-echo $agent->ask('Который час в Москве и сколько будет 17% от 4300?');
-```
-
-Модель сама решит, что ей нужен `get_time` и `calculator`, вызовет их,
-получит результаты и ответит. Вам не нужно писать парсеры намерений.
-
----
-
 ## Что внутри
 
 - **`AiClient`** — один HTTP-вызов `/chat/completions` для DeepSeek, OpenAI,
@@ -24,7 +9,7 @@ echo $agent->ask('Который час в Москве и сколько буд
 - **`LoggingClient`** — декоратор: пишет каждый запрос, ответ, токены и время.
 - **18 готовых инструментов**: время, калькулятор, погода, файлы (чтение,
   запись, поиск), CSV, HTTP, единицы, даты, UUID, хеши, JSON, явное завершение
-  и команды оболочки — см. [таблицу](#инструменты).
+  и команды оболочки — см. [таблицу](docs/tools.md).
 
 Без Composer, без фреймворка, без БД. Только PHP и расширение `curl`.
 
@@ -48,29 +33,6 @@ php examples/01-chat.php
 ```
 
 Дальше — `php examples/02-tools.php`: там модель уже вызывает инструменты.
-
-## Примеры
-
-Каждый пример начинается с заголовка «Инструменты / Флаги» — по нему видно,
-что именно зарегистрировано и какие настройки включены.
-
-| Файл | Что показывает | Инструменты | Флаги |
-|---|---|---|---|
-| `01-chat.php` | простой ответ | — | — |
-| `02-tools.php` | цикл вызова инструментов | `get_time`, `calculator`, `get_weather` | значения по умолчанию |
-| `03-custom-tool.php` | свой инструмент с нуля | `server_info` | — |
-| `04-cli.php` | диалог в терминале | `get_time`, `calculator`, `get_weather` | — |
-| `05-settings.php` | настройки агента | `get_time`, `calculator` | `toolChoice`, `toolApproval`, `historyLimit` |
-| `06-finish.php` | явное завершение | `finish`, `calculator` | `toolChoice=required`, `finishTool` |
-| `07-tools.php` | прикладные утилиты | `convert_units`, `date_calc`, `uuid`, `hash_text` | — |
-| `08-shell.php` | команды оболочки | `run_command` | `workdir`, `shell`, `timeout`, `maxOutput`, `allow`, `tmpDir` |
-| `09-files.php` | файлы и поиск | `read_file`, `list_dir`, `write_file`, `replace_in_file`, `search_files`, `find_files` | песочница, `create_dirs`, `all` |
-| `10-http.php` | HTTP без сети | `http_request` | `allowPrivate`, `auth`, методы |
-| `11-json.php` | инструменты без модели | `json_query`, `convert_units`, `date_calc`, `uuid`, `hash_text` | — |
-| `12-logging.php` | логи запросов | `get_time`, `calculator` | `verbose`, `sink` |
-
-`10-http.php` и `11-json.php` работают без модели и без сети — их можно запускать
-где угодно. Остальные обращаются к модели из `.env`.
 
 ## Структура
 
@@ -125,6 +87,7 @@ examples/
 tests/run.php          раннер тестов
 tests/support.php      помощники, заглушки, FakeClient
 tests/cases/           тесты по темам (agent, files, http, shell, ...)
+docs/                  инструменты, примеры, провайдеры, справочник
 ```
 
 ## Как это работает
@@ -221,235 +184,6 @@ LLM ← tool_calls: get_time, calculator, 6084 мс, токены 377/44
 Ошибки пишутся строкой `LLM ✗` и **пробрасываются дальше**: декоратор ничего
 не глотает.
 
-## Инструменты
-
-| Инструмент | Что делает | Как подключить |
-|---|---|---|
-| `get_time` | дата и время в часовом поясе | — |
-| `calculator` | арифметика без `eval()` | — |
-| `get_weather` | погода (open-meteo, без ключа) | — |
-| `read_file` | чтение файла внутри корня | `new ReadFileTool($sandbox)` |
-| `write_file` | создать/перезаписать файл | `new WriteFileTool($sandbox)` |
-| `replace_in_file` | точечная замена фрагмента | `new ReplaceInFileTool($sandbox)` |
-| `search_files` | поиск по содержимому (grep) | `new SearchFilesTool($sandbox)` |
-| `find_files` | поиск файлов по маске | `new FindFilesTool($sandbox)` |
-| `list_dir` | содержимое каталога | `new ListDirTool($sandbox)` |
-| `csv_query` | выборка из CSV с фильтром | `new CsvQueryTool($sandbox)` |
-| `json_query` | значение по пути из JSON | — |
-| `http_request` | любой метод, тело, Basic/Bearer | — |
-| `convert_units` | температура, длина, масса, скорость | — |
-| `date_calc` | разница дат, «+30 days» | — |
-| `uuid` | UUID v4 | — |
-| `hash_text` | sha256 / sha1 / md5 | — |
-| `finish` | завершение с результатом | `finishTool: 'finish'` |
-| `run_command` | команды оболочки | `new ShellTool(workdir: ...)` |
-
-Файловые инструменты работают только внутри явно заданного корня:
-
-```php
-$sandbox = new FileSandbox(__DIR__ . '/data');
-
-$tools = (new ToolRegistry())->add(
-    new ReadFileTool($sandbox),
-    new WriteFileTool($sandbox),
-    new ReplaceInFileTool($sandbox),
-    new SearchFilesTool($sandbox),
-    new FindFilesTool($sandbox),
-    new ListDirTool($sandbox),
-    new CsvQueryTool($sandbox),
-);
-```
-
-- всё вне корня отвергается: `..`, абсолютные пути, симлинки наружу;
-- запись атомарная: временный файл рядом и `rename`, полузаписанных файлов нет;
-- `replace_in_file` требует **ровно одного** совпадения `search` — чтобы модель
-  не заменила не тот кусок; для осознанной массовой замены есть `all: true`;
-- поиск пропускает `.git`, `vendor`, `node_modules`, `var` и не читает бинарные
-  файлы и файлы больше 1 МБ;
-- большие файлы читаются через `offset` и `limit` в строках.
-
-### Песочница: включить и выключить
-
-По умолчанию всё ограничено корнем. Ограничение снимается осознанно — и
-**отдельно для каждого инструмента**, потому что каждый получает свой экземпляр:
-
-```php
-$root = __DIR__ . '/data';
-
-$tools = (new ToolRegistry())->add(
-    new ReadFileTool(FileSandbox::unrestricted()),  // читать где угодно
-    new WriteFileTool(new FileSandbox($root)),      // писать только в data
-);
-```
-
-- `new FileSandbox($root)` — только внутри корня (по умолчанию);
-- `FileSandbox::unrestricted($root)` — абсолютные пути и `..` разрешены,
-  корень нужен только как база для относительных путей;
-- `$sandbox->isRestricted()` — проверить текущий режим.
-
-Свободный режим — это фактически файловый `run_command`: модель сможет
-прочитать `~/.ssh/id_rsa` или перезаписать системный файл. Включайте, только
-если процесс и так ограничен контейнером или отдельным пользователем.
-
-Запись — единственная деструктивная операция среди файловых инструментов.
-Перед регистрацией `write_file`/`replace_in_file` стоит подумать о
-`toolApproval`: хук может спросить человека или запретить запись вне нужных
-каталогов.
-
-`json_query` достаёт значение по простому пути — удобно после `http_request`,
-когда ответ большой:
-
-```php
-(new JsonQueryTool())->handle([
-    'json' => '{"data":{"items":[{"id":42}]}}',
-    'path' => 'data.items[0].id',
-]); // data.items[0].id = 42
-```
-
-`http_request` — любой метод с параметрами и авторизацией:
-
-```php
-$tools->add(new HttpRequestTool(
-    auth: [                              // креды по хосту, модель их не видит
-        'api.example.com' => ['user' => 'bot', 'pass' => '***'],
-        'other.example.com' => ['type' => 'bearer', 'token' => '***'],
-    ],
-));
-```
-
-Что умеет:
-
-- методы `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD`, `OPTIONS`;
-- `query` — добавляется к URL, кодируется по RFC 3986;
-- `body` — объект уходит как JSON (или form при `content_type: form`),
-  строка — как есть;
-- `headers` — свои заголовки, кроме `Host`, `Content-Length`,
-  `Transfer-Encoding`, `Connection` (их ставит cURL);
-- `auth` аргументом — для разовых запросов; аргумент важнее карты из конструктора;
-- `max_chars` — ограничение ответа.
-
-Защита:
-
-- только `http`/`https`, только публичные адреса: `localhost`, `10.x`,
-  `172.16–31.x`, `192.168.x`, `169.254.x`, CGNAT запрещены;
-- редиректы проверяются заново на каждом шаге; для `POST`/`PUT`/`DELETE`
-  редирект не преследуется — возвращается `Location` и предложение повторить;
-- размер ответа ограничен, запрос обрывается при превышении.
-
-Нужен доступ к своим внутренним API — создайте инструмент с флагом:
-
-```php
-new HttpRequestTool(allowPrivate: true, auth: ['10.10.10.84' => ['user' => 'admin', 'pass' => '***']]);
-```
-
-Флаг снимает **все** проверки адреса, кроме схемы: инструмент станет ходить
-куда угодно, включая `localhost`. Это осознанный компромисс для внутренних
-сервисов; в публичном сценарии оставляйте `false`.
-
-Осторожно с кредами в конструкторе: они добавляются к **каждому** запросу
-на этот хост, включая редиректы внутри него. Если это нежелательно — передавайте
-`auth` аргументом на конкретный вызов.
-
-`convert_units` отвечает каноническими кодами (`5 км` → `5 km`), понимает
-и русские названия единиц.
-
-Чего здесь нет осознанно: `sql_query`. Доступ к БД слишком зависит от проекта —
-драйвер, схема, права. Нужен такой инструмент — напишите свой и дайте ему
-read-only пользователя; в ядре такие права «по умолчанию» не выдаются.
-
-## Команды оболочки
-
-`run_command` — единственный инструмент, который может сделать на машине
-что угодно. В реестр сам себя он не добавляет: регистрируйте осознанно.
-
-```php
-$tools->add(new ShellTool(
-    workdir: __DIR__,       // где выполнять
-    shell: 'auto',          // auto | bash | sh | cmd | powershell | pwsh
-    timeout: 10.0,          // секунды до принудительного завершения
-    maxOutput: 16000,       // предел stdout/stderr
-    allow: ['git', 'php'],  // необязательный allowlist по первому слову
-    tmpDir: null,           // куда писать вывод; null — системный temp
-));
-```
-
-Что делает:
-
-- каждый вызов — новый процесс: `cd` и переменные между вызовами не живут;
-- stdin закрыт, поэтому `vim`, `more`, `ssh` не зависнут;
-- таймаут убивает процесс (на Windows — вместе с дочерними);
-- при переполнении вывода команда прерывается, а не забивает диск;
-- рабочий каталог фиксируется конструктором;
-- авто-оболочка: `cmd` на Windows, `bash` на Unix; `powershell` и `pwsh`
-  доступны явно, для них используется `-EncodedCommand` (кавычки не ломаются).
-
-Чего не делает:
-
-- **не изолирует**: команда имеет права процесса PHP;
-- `allow` — грубый фильтр по первому слову, а не песочница:
-  `php -r '...'` через него пройдёт;
-- у `cmd` ограничение длины команды ~8 КБ.
-
-Нужна настоящая изоляция — запускайте агента в контейнере, а не надейтесь
-на фильтры внутри процесса.
-
-В контейнерах системный `temp` часто недоступен — задайте `tmpDir` явно,
-иначе инструмент вернёт «Не удалось создать временные файлы».
-
-
-## Свой инструмент
-
-Четыре метода. Всё.
-
-```php
-use AiSdk\Tool;
-
-final class DiceTool implements Tool
-{
-    public function name(): string
-    {
-        return 'roll_dice';
-    }
-
-    public function description(): string
-    {
-        // Модель читает это и решает, когда звать инструмент.
-        return 'Бросить кубик с указанным числом граней.';
-    }
-
-    public function parameters(): array
-    {
-        // JSON Schema, формат OpenAI function calling.
-        return [
-            'type' => 'object',
-            'properties' => [
-                'sides' => ['type' => 'integer', 'description' => 'Число граней, по умолчанию 6.'],
-            ],
-            'required' => [],
-            'additionalProperties' => false,
-        ];
-    }
-
-    public function handle(array $args): string
-    {
-        $sides = max(2, (int) ($args['sides'] ?? 6));
-
-        return 'Выпало: ' . random_int(1, $sides);
-    }
-}
-```
-
-Регистрация:
-
-```php
-$tools = (new ToolRegistry())->add(new DiceTool(), new TimeTool());
-$agent = new Agent(AiClient::fromEnv(), $tools);
-```
-
-Советы по описанию: пишите, **когда** инструмент нужен, а не только что он
-делает. Модель выбирает по описанию, поэтому «верни курс валют» работает хуже,
-чем «курс валют ЦБ на сегодня; вызывай, когда спрашивают про курс доллара».
-
 ## Завершение через finish
 
 Обычно агент останавливается, когда модель вернула текст. Но текст — плохой
@@ -492,40 +226,12 @@ echo $agent->ask('«Не приходит SMS с кодом, второй ден
 - если модель не положила `result`, вернётся «(модель завершила работу без результата)»;
 - `toolApproval` на finish не действует — это сигнал, а не действие.
 
-## Провайдеры
+## Документация
 
-Меняется только `.env`:
-
-| Провайдер | `AI_BASE_URL` | `AI_MODEL` |
-|---|---|---|
-| DeepSeek | `https://api.deepseek.com` | `deepseek-chat` / `deepseek-flash` |
-| OpenAI | `https://api.openai.com/v1` | `gpt-4o-mini` |
-| OpenRouter | `https://openrouter.ai/api/v1` | `anthropic/claude-3.5-sonnet` |
-| Ollama | `http://localhost:11434/v1` | `qwen2.5:7b` |
-| llama.cpp | `http://localhost:8080/v1` | `qwen3-8b` |
-
-У Ollama и llama.cpp `AI_API_KEY` можно оставить пустым.
-
-Не все локальные модели умеют function calling. Если инструменты не
-вызываются — проверьте, что модель их поддерживает (qwen2.5/qwen3, llama 3.1+,
-mistral-nemo и т.п.).
-
-## Если не подключается
-
-| Ошибка | Причина | Решение |
-|---|---|---|
-| `SSL certificate problem: unable to get local issuer certificate` | у PHP нет CA-бандла (обычно Windows) | `AI_CAINFO=C:\path\cacert.pem`; быстрый обход — `AI_VERIFY_SSL=false` |
-| `Ошибка сети: Connection refused` | сервер не запущен или другой порт | проверить `AI_BASE_URL` (`curl http://host:8080/v1/models`) |
-| `HTTP 401` | пустой или неверный ключ | `AI_API_KEY` |
-| `HTTP 404` / `model not found` | модель не загружена | `AI_MODEL` = имя из `/v1/models` |
-| `HTTP 400 unknown field 'thinking'` | провайдер не DeepSeek | `AI_DISABLE_THINKING=false` |
-| Инструменты не вызываются | модель или сборка не умеют tools | qwen3 / llama 3.1+; llama.cpp должен быть с `--jinja` |
-
-Проверить сервер до всякого кода:
-
-```bash
-curl http://10.10.10.77:8080/v1/models
-```
+- [docs/tools.md](docs/tools.md) — инструменты, песочница, оболочка, свой инструмент
+- [docs/examples.md](docs/examples.md) — все примеры: что показывают и какие флаги
+- [docs/providers.md](docs/providers.md) — провайдеры и типовые ошибки подключения
+- [docs/reference.md](docs/reference.md) — API, безопасность, чего здесь нет
 
 ## Тесты
 
@@ -533,109 +239,11 @@ curl http://10.10.10.77:8080/v1/models
 php tests/run.php
 ```
 
-100 проверок: калькулятор, время, реестр, обрезка результатов, весь цикл агента,
-настройки (tool_choice, подтверждение вызовов, история), finish, файлы
-(чтение, запись, замена, поиск, побег из песочницы, свободный режим), CSV,
-единицы, даты, uuid/хеши, сборка HTTP-запроса (методы, тело, заголовки,
-Basic/Bearer), защита от SSRF, run_command (код выхода, таймаут, allowlist,
-обрезка), логирование запросов
-(успех, ошибка инструмента, лимит раундов, история). Сеть не нужна — модель
-подменяется `FakeClient` из `tests/run.php`.
-
-## Чего здесь сознательно нет
-
-Это основа, а не фреймворк. Добавляется по месту, когда понадобится:
-
-| Нужно | Куда добавить |
-|---|---|
-| Повторы при 429/5xx | цикл в `AiClient::chat()` вокруг `post()` |
-| Стриминг ответа | `stream: true` + чтение чанков (сложнее, отдельный метод) |
-| Логирование запросов в БД | обёртка над `ChatClient` (декоратор), 20 строк |
-| Память между запусками | сохранить `$agent->messages()` в JSON/БД |
-| Стоимость и токены | уже есть в `ChatResult::$usage` |
-| Ограничение частоты | обёртка над `ChatClient` по образцу логгера |
-| Роли и права на инструменты | не отдавать часть `ToolRegistry` в `Agent` |
-
-Декоратор — самый полезный приём. Пример логирования без правки SDK:
-
-```php
-final class LoggingClient implements ChatClient
-{
-    public function __construct(private ChatClient $inner) {}
-
-    public function chat(array $messages, array $tools = [], array $options = []): ChatResult
-    {
-        $started = microtime(true);
-        $result = $this->inner->chat($messages, $tools, $options);
-        error_log(sprintf('LLM: %d мс, токенов %d', (microtime(true) - $started) * 1000, $result->usage['total_tokens'] ?? 0));
-
-        return $result;
-    }
-}
-
-$agent = new Agent(new LoggingClient(AiClient::fromEnv()), $tools);
-```
-
-## Безопасность
-
-- **Инструмент выполняет ваш код.** Не давайте модели то, что не дали бы
-  пользователю: `exec`, запись файлов, SQL, доступ к внутренней сети.
-- **Валидируйте аргументы внутри `handle()`** — модель может прислать что
-  угодно, включая `null` и лишние поля.
-- **Обрезайте результаты** — в реестре есть лимит (`maxResultChars`), он
-  защищает контекст от гигантских ответов.
-- **Не отдавайте в `ToolRegistry` больше прав, чем нужно** конкретному сценарию.
-- `calculator` считает сам, без `eval()` — не заменяйте на `eval`.
-
-## Шпаргалка по API
-
-```php
-// Клиент
-$client = AiClient::fromEnv();
-$result = $client->chat($messages, $tools = [], $options = []);
-// options: tool_choice, parallel_tool_calls, temperature, max_tokens
-$result->text; $result->toolCalls; $result->usage;
-
-// Логирование поверх любого клиента
-$client = new LoggingClient($client, sink: fn (string $l) => error_log($l), verbose: true);
-
-// Агент
-$agent = new Agent(
-    client: $client,
-    tools: $tools,
-    systemPrompt: '...',
-    maxRounds: 5,
-    toolChoice: 'auto',          // auto | none | required | имя
-    parallelToolCalls: true,
-    historyLimit: 40,            // 0 — без обрезки
-    toolApproval: fn ($name, $args): bool => true,
-);
-$agent->ask('вопрос');     // string
-$agent->trace();           // [{name, arguments, output, ms, blocked}]
-$agent->messages();        // вся история
-$agent->setSystemPrompt('новый промпт'); // на ходу, история сохраняется
-$agent->systemPrompt();    // текущий промпт
-$agent->reset();
-
-// Агент целиком из .env
-$agent = Agent::fromEnv($tools, 'Отвечай кратко.');
-
-// Реестр
-$registry = (new ToolRegistry($maxResultChars = 4000))->add($tool1, $tool2);
-$registry->definitions();  // схемы для модели
-$registry->execute($name, $args); // string, не бросает исключений
-
-// Инструмент
-final class MyTool implements Tool {
-    public function name(): string;
-    public function description(): string;
-    public function parameters(): array;
-    public function handle(array $args): string;
-}
-
-// Завершение: модель зовёт finish(result), Agent возвращает result
-$tools->add(new FinishTool());
-```
+100 проверок: калькулятор, время, реестр, обрезка результатов, весь цикл агента
+(включая ошибку инструмента и лимит раундов), настройки, finish, файлы и
+песочница (включая свободный режим), CSV, единицы, даты, uuid/хеши, сборка
+HTTP-запроса, защита от SSRF, оболочка (код выхода, таймаут, allowlist), логирование.
+Сеть не нужна — модель подменяется `FakeClient` из `tests/support.php`.
 
 ## Проверка без модели
 
