@@ -8,8 +8,8 @@ namespace AiSdk;
  * Колбэки хода работы агента.
  *
  * Нужны, чтобы интерфейс (CLI, веб, лог) видел, что происходит, в реальном
- * времени: номер шага, начало и конец инструмента, финальный ответ и запрос
- * на остановку. Любой колбэк можно не задавать.
+ * времени: номер шага, начало и конец инструмента и запрос на остановку.
+ * Любой колбэк можно не задавать.
  *
  *   $agent = new Agent(
  *       client: $client,
@@ -29,14 +29,12 @@ final class AgentHooks
      * @param (\Closure(string, array<string, mixed>): void)|null $onToolStart имя инструмента и аргументы
      * @param (\Closure(array{name: string, arguments: array<string, mixed>, output: string, ms: int, blocked: bool}): void)|null $onToolEnd
      *        запись трассировки после выполнения инструмента
-     * @param (\Closure(string): void)|null $onAnswer финальный текст ответа
      * @param (\Closure(): bool)|null $shouldStop возвращает true — остановиться между раундами
      */
     public function __construct(
         public readonly ?\Closure $onStep = null,
         public readonly ?\Closure $onToolStart = null,
         public readonly ?\Closure $onToolEnd = null,
-        public readonly ?\Closure $onAnswer = null,
         public readonly ?\Closure $shouldStop = null,
     ) {
     }
@@ -60,11 +58,6 @@ final class AgentHooks
     public function toolEnd(array $step): void
     {
         $this->fire($this->onToolEnd, $step);
-    }
-
-    public function answer(string $text): void
-    {
-        $this->fire($this->onAnswer, $text);
     }
 
     /**

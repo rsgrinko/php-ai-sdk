@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace AiSdk;
 
-
 /**
  * Диалог с моделью и цикл вызова инструментов.
  *
@@ -173,7 +172,6 @@ final class Agent
 
         $text = $result->text !== '' ? $result->text : '(модель вернула пустой ответ)';
         $this->messages[] = ['role' => 'assistant', 'content' => $text];
-        $this->hooks?->answer($text);
 
         return $text;
     }
@@ -341,7 +339,6 @@ final class Agent
     {
         $text = $result !== '' ? $result : '(модель завершила работу без результата)';
         $this->messages[] = ['role' => 'assistant', 'content' => $text];
-        $this->hooks?->answer($text);
 
         return $text;
     }
@@ -467,4 +464,5 @@ final class Agent
      * Быстрый старт: агент с инструментами по умолчанию.
      */
 }
+
 

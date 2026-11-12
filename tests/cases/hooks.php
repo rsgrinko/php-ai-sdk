@@ -23,9 +23,6 @@ test('hooks: шаги, инструменты и ответ идут по пор
         onToolEnd: static function (array $step) use (&$events): void {
             $events[] = 'end ' . $step['name'] . ' -> ' . $step['output'];
         },
-        onAnswer: static function (string $text) use (&$events): void {
-            $events[] = 'answer ' . $text;
-        },
     );
 
     $client = new FakeClient([
@@ -48,7 +45,6 @@ test('hooks: шаги, инструменты и ответ идут по пор
         'start calculator',
         'end calculator -> 2+2 = 4',
         'step 2/3',
-        'answer 4',
     ], $events);
 });
 
@@ -97,9 +93,6 @@ test('hooks: finish виден как инструмент и как ответ'
         onToolStart: static function (string $name) use (&$events): void {
             $events[] = 'start ' . $name;
         },
-        onAnswer: static function (string $text) use (&$events): void {
-            $events[] = 'answer ' . $text;
-        },
     );
 
     $client = new FakeClient([
@@ -115,5 +108,6 @@ test('hooks: finish виден как инструмент и как ответ'
     );
 
     assertSame('готово', $agent->ask('сделай'));
-    assertSame(['start finish', 'answer готово'], $events);
+    assertSame(['start finish'], $events);
 });
+

@@ -6,8 +6,8 @@ declare(strict_types=1);
  * Пример 14. Хуки агента: прогресс, инструменты, остановка.
  *
  * Инструменты: get_time, calculator.
- * Флаги: hooks (AgentHooks с onStep, onToolStart, onToolEnd, onAnswer,
- *        shouldStop).
+ * Флаги: hooks (AgentHooks с onStep, onToolStart, onToolEnd, shouldStop).
+ *        shouldStop проверяется между раундами.
  *
  * Хуки — это колбэки без логики: агент вызывает их в ходе работы, а вы решаете,
  * что делать — печатать прогресс, писать лог, показать кнопку «стоп».
@@ -36,7 +36,6 @@ $hooks = new AgentHooks(
     onToolEnd: static fn (array $step) => print(
         '  ← ' . mb_substr(str_replace("\n", ' ', $step['output']), 0, 70) . PHP_EOL
     ),
-    onAnswer: static fn (string $text) => print('ответ: ' . $text . PHP_EOL),
 );
 
 $agent = new Agent(
@@ -48,7 +47,7 @@ $agent = new Agent(
 );
 
 echo '1) обычный ход' . PHP_EOL;
-$agent->ask('Который час в Москве и сколько будет 2+2?');
+echo 'ответ: ' . $agent->ask('Который час в Москве и сколько будет 2+2?') . PHP_EOL;
 
 // 2. Остановка: shouldStop проверяется между раундами, поэтому история
 //    остаётся целой, а модель больше не вызывается.
@@ -66,3 +65,5 @@ $stopped = new Agent(
 );
 
 echo 'ответ: ' . $stopped->ask('Который час в Москве?') . PHP_EOL;
+
+
