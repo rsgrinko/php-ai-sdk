@@ -38,7 +38,7 @@ final class HttpRequestTool implements Tool
      */
     public function __construct(
         array $auth = [],
-        private readonly bool $allowPrivate = false,
+        bool $allowPrivate = false,
         private readonly int $defaultChars = 4000,
     ) {
         $normalized = [];
@@ -226,4 +226,5 @@ final class HttpRequestTool implements Tool
 
 
 }
+
 

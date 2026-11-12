@@ -359,3 +359,32 @@ test('sandbox: ограниченный режим по-прежнему бло�
 });
 
 
+
+test('search_files: лимит останавливает обход', function (): void {
+    $dir = testDir();
+    file_put_contents($dir . '/a.txt', "one\ntwo\nthree\n");
+
+    $result = (new SearchFilesTool(new FileSandbox($dir)))->handle([
+        'pattern' => '\w+',
+        'limit' => 2,
+    ]);
+
+    assertContains('обрезано по лимиту 2', $result);
+    assertContains('Найдено 2', $result);
+});
+
+test('find_files: лимит останавливает обход', function (): void {
+    $dir = testDir();
+
+    for ($i = 1; $i <= 5; $i++) {
+        file_put_contents($dir . '/f' . $i . '.php', 'x');
+    }
+
+    $result = (new FindFilesTool(new FileSandbox($dir)))->handle([
+        'pattern' => '*.php',
+        'limit' => 2,
+    ]);
+
+    assertContains('обрезано по лимиту 2', $result);
+    assertContains('Найдено 2', $result);
+});

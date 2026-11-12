@@ -98,35 +98,30 @@ final class SearchFilesTool implements Tool
         }
 
         $results = [];
-        $truncated = false;
 
-        try {
-            FileWalker::walk($start, function (string $file) use (&$results, $regex, $glob, $limit): void {
-                $relative = $this->sandbox->relative($file);
+        FileWalker::walk($start, function (string $file) use (&$results, $regex, $glob, $limit): bool {
+            $relative = $this->sandbox->relative($file);
 
-                if (!fnmatch($glob, $relative) && !fnmatch($glob, basename($file))) {
-                    return;
-                }
-
-                foreach ($this->matchLines($file, $regex) as $line) {
-                    $results[] = $relative . ':' . $line;
-
-                    if (count($results) >= $limit) {
-                        throw new \RuntimeException('__limit__');
-                    }
-                }
-            });
-        } catch (\RuntimeException $e) {
-            if ($e->getMessage() !== '__limit__') {
-                return 'Ошибка поиска: ' . $e->getMessage();
+            if (!fnmatch($glob, $relative) && !fnmatch($glob, basename($file))) {
+                return true;
             }
 
-            $truncated = true;
-        }
+            foreach ($this->matchLines($file, $regex) as $line) {
+                $results[] = $relative . ':' . $line;
+
+                if (count($results) >= $limit) {
+                    return false; // лимит: останавливаем обход
+                }
+            }
+
+            return true;
+        });
 
         if ($results === []) {
             return 'Ничего не найдено по "' . $pattern . '".';
         }
+
+        $truncated = count($results) >= $limit;
 
         return 'Найдено ' . count($results) . ($truncated ? ' (обрезано по лимиту ' . $limit . ')' : '') . ":\n"
             . implode("\n", $results);

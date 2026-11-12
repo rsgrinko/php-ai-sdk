@@ -47,11 +47,6 @@ final class FileSandbox
         return new self($base, false);
     }
 
-    public function root(): string
-    {
-        return $this->root;
-    }
-
     public function isRestricted(): bool
     {
         return $this->restricted;

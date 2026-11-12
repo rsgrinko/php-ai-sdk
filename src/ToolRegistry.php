@@ -34,14 +34,6 @@ final class ToolRegistry
     }
 
     /**
-     * @return list<Tool>
-     */
-    public function all(): array
-    {
-        return array_values($this->tools);
-    }
-
-    /**
      * Схемы для поля "tools" запроса к модели.
      *
      * @return list<array<string, mixed>>

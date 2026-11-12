@@ -76,34 +76,25 @@ final class FindFilesTool implements Tool
         }
 
         $found = [];
-        $truncated = false;
 
-        try {
-            FileWalker::walk($start, function (string $path) use (&$found, $pattern, $limit): void {
-                $relative = $this->sandbox->relative($path);
+        FileWalker::walk($start, function (string $path) use (&$found, $pattern, $limit): bool {
+            $relative = $this->sandbox->relative($path);
 
-                if (!fnmatch($pattern, $relative) && !fnmatch($pattern, basename($path))) {
-                    return;
-                }
-
-                $size = @filesize($path);
-                $found[] = $relative . ' (' . Bytes::human($size === false ? 0 : $size) . ')';
-
-                if (count($found) >= $limit) {
-                    throw new \RuntimeException('__limit__');
-                }
-            });
-        } catch (\RuntimeException $e) {
-            if ($e->getMessage() !== '__limit__') {
-                return 'Ошибка поиска: ' . $e->getMessage();
+            if (!fnmatch($pattern, $relative) && !fnmatch($pattern, basename($path))) {
+                return true;
             }
 
-            $truncated = true;
-        }
+            $size = @filesize($path);
+            $found[] = $relative . ' (' . Bytes::human($size === false ? 0 : $size) . ')';
+
+            return count($found) < $limit;
+        });
 
         if ($found === []) {
             return 'Файлы не найдены по маске "' . $pattern . '".';
         }
+
+        $truncated = count($found) >= $limit;
 
         return 'Найдено ' . count($found) . ($truncated ? ' (обрезано по лимиту ' . $limit . ')' : '') . ":\n"
             . implode("\n", $found);

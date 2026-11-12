@@ -131,7 +131,6 @@ final class AiClient implements ChatClient
             toolCalls: self::parseToolCalls($message),
             assistantMessage: $assistant,
             usage: is_array($data['usage'] ?? null) ? $data['usage'] : [],
-            raw: $data,
         );
     }
 
@@ -215,5 +214,6 @@ final class AiClient implements ChatClient
         return ['type' => 'function', 'function' => ['name' => $choice]];
     }
 }
+
 
 
