@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace AiSdk\Tools;
 
 use AiSdk\Tool;
+use AiSdk\Tools\Support\Bytes;
+use AiSdk\Tools\Support\FileWalker;
 
 /**
  * Поиск по содержимому файлов внутри песочницы (аналог grep).
@@ -14,7 +16,6 @@ use AiSdk\Tool;
  */
 final class SearchFilesTool implements Tool
 {
-    private const IGNORED = ['.git', '.idea', '.vscode', 'vendor', 'node_modules', 'var'];
     private const MAX_FILE = 1048576;
     private const MAX_LINE = 200;
 
@@ -100,7 +101,7 @@ final class SearchFilesTool implements Tool
         $truncated = false;
 
         try {
-            $this->eachFile($start, function (string $file) use (&$results, $regex, $glob, $limit): void {
+            FileWalker::walk($start, function (string $file) use (&$results, $regex, $glob, $limit): void {
                 $relative = $this->sandbox->relative($file);
 
                 if (!fnmatch($glob, $relative) && !fnmatch($glob, basename($file))) {
@@ -192,30 +193,4 @@ final class SearchFilesTool implements Tool
     /**
      * @param callable(string): void $onFile
      */
-    private function eachFile(string $directory, callable $onFile): void
-    {
-        $entries = @scandir($directory);
-
-        if ($entries === false) {
-            return;
-        }
-
-        foreach ($entries as $name) {
-            if ($name === '.' || $name === '..' || in_array($name, self::IGNORED, true)) {
-                continue;
-            }
-
-            $path = $directory . DIRECTORY_SEPARATOR . $name;
-
-            if (is_dir($path)) {
-                $this->eachFile($path, $onFile);
-
-                continue;
-            }
-
-            if (is_file($path)) {
-                $onFile($path);
-            }
-        }
-    }
 }

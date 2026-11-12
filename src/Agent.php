@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace AiSdk;
 
-use AiSdk\Tools\CalculatorTool;
-use AiSdk\Tools\TimeTool;
 
 /**
  * Диалог с моделью и цикл вызова инструментов.
@@ -410,11 +408,4 @@ final class Agent
     /**
      * Быстрый старт: агент с инструментами по умолчанию.
      */
-    public static function withDefaults(ChatClient $client): self
-    {
-        return new self(
-            $client,
-            (new ToolRegistry())->add(new TimeTool(), new CalculatorTool()),
-        );
-    }
 }

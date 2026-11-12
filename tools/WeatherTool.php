@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace AiSdk\Tools;
 
-use AiSdk\Http;
+use AiSdk\HttpTransport;
 use AiSdk\Tool;
 
 /**
@@ -90,7 +90,7 @@ final class WeatherTool implements Tool
             'timezone' => 'auto',
         ]);
 
-        [$status, $body] = Http::get('https://api.open-meteo.com/v1/forecast?' . $query);
+        [$status, $body] = HttpTransport::get('https://api.open-meteo.com/v1/forecast?' . $query);
         $data = json_decode($body, true);
         $current = $data['current'] ?? null;
 
@@ -124,7 +124,7 @@ final class WeatherTool implements Tool
             'format' => 'json',
         ]);
 
-        [$status, $body] = Http::get('https://geocoding-api.open-meteo.com/v1/search?' . $query);
+        [$status, $body] = HttpTransport::get('https://geocoding-api.open-meteo.com/v1/search?' . $query);
 
         if ($status >= 400) {
             return null;
@@ -150,3 +150,4 @@ final class WeatherTool implements Tool
         ];
     }
 }
+

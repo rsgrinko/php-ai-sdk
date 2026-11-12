@@ -121,36 +121,6 @@ final class FileSandbox
      * Атомарная запись: сначала во временный файл рядом, потом rename.
      * Так при сбое не остаётся полузаписанный файл.
      */
-    public function writeAtomic(string $absolute, string $content): void
-    {
-        $directory = dirname($absolute);
-        $temporary = @tempnam($directory, '.aisdk_');
-
-        if ($temporary === false) {
-            throw new \RuntimeException('Не удалось создать временный файл в ' . $directory);
-        }
-
-        $written = @file_put_contents($temporary, $content);
-
-        if ($written === false) {
-            @unlink($temporary);
-
-            throw new \RuntimeException('Не удалось записать файл.');
-        }
-
-        @chmod($temporary, 0644);
-
-        // На Windows rename не перезаписывает существующий файл.
-        if (is_file($absolute) && DIRECTORY_SEPARATOR === '\\') {
-            @unlink($absolute);
-        }
-
-        if (!@rename($temporary, $absolute)) {
-            @unlink($temporary);
-
-            throw new \RuntimeException('Не удалось переименовать временный файл.');
-        }
-    }
 
     /**
      * Путь для показа пользователю (относительно корня, если внутри него).

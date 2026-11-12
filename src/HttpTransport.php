@@ -11,7 +11,7 @@ namespace AiSdk;
  * request() — низкоуровневый вызов: метод, заголовки, тело, лимит размера.
  * На нём построен http_request, включая защиту от SSRF.
  */
-final class Http
+final class HttpTransport
 {
     /**
      * @return array{0: int, 1: string} HTTP-код и тело ответа
@@ -21,6 +21,23 @@ final class Http
         $response = self::request($url, $timeout, true);
 
         return [$response['status'], $response['body']];
+    }
+
+    /**
+     * Подсказка при типовой ошибке TLS на Windows.
+     */
+    private static function tlsHint(string $error, bool $verify): string
+    {
+        if (!$verify) {
+            return '';
+        }
+
+        if (!str_contains($error, 'certificate') && !str_contains($error, 'SSL')) {
+            return '';
+        }
+
+        return ' Подсказка: укажите путь к корневым сертификатам в AI_CAINFO '
+            . 'или временно поставьте AI_VERIFY_SSL=false (только локально).';
     }
 
     /**
@@ -139,7 +156,10 @@ final class Http
 
         // 23 = CURLE_WRITE_ERROR: это мы сами оборвали слишком большой ответ.
         if ($errno !== 0 && !($truncated && $errno === 23)) {
-            throw new AiException('HTTP-ошибка: ' . ($error !== '' ? $error : 'код ' . $errno));
+            throw new AiException(
+                'HTTP-ошибка: ' . ($error !== '' ? $error : 'код ' . $errno)
+                . self::tlsHint($error, $verify)
+            );
         }
 
         return [
@@ -151,3 +171,4 @@ final class Http
         ];
     }
 }
+

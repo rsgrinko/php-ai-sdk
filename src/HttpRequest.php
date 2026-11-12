@@ -97,7 +97,7 @@ final class HttpRequest
         return new self($method, $url, $normalized, $encoded);
     }
 
-    private static function normalizeUrl(string $url): string
+    public static function normalizeUrl(string $url): string
     {
         $url = trim($url);
 
@@ -110,6 +110,39 @@ final class HttpRequest
         }
 
         return 'https://' . ltrim($url, '/');
+    }
+
+    /**
+     * Абсолютный адрес редиректа относительно текущего URL.
+     *
+     * @throws \RuntimeException если базовый адрес некорректен
+     */
+    public static function resolveRedirect(string $base, string $location): string
+    {
+        if (preg_match('#^https?://#i', $location) === 1) {
+            return $location;
+        }
+
+        $parts = parse_url($base);
+
+        if ($parts === false || !isset($parts['scheme'], $parts['host'])) {
+            throw new \RuntimeException('некорректный адрес редиректа');
+        }
+
+        $origin = $parts['scheme'] . '://' . $parts['host']
+            . (isset($parts['port']) ? ':' . $parts['port'] : '');
+
+        if (str_starts_with($location, '//')) {
+            return $parts['scheme'] . ':' . $location;
+        }
+
+        if (str_starts_with($location, '/')) {
+            return $origin . $location;
+        }
+
+        $directory = rtrim(dirname($parts['path'] ?? '/'), '/');
+
+        return $origin . $directory . '/' . $location;
     }
 
     /**
@@ -212,3 +245,4 @@ final class HttpRequest
         return 'Basic ' . base64_encode($user . ':' . $pass);
     }
 }
+

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace AiSdk\Tools;
 
 use AiSdk\Tool;
+use AiSdk\Tools\Support\Bytes;
 
 /**
  * Список файлов и каталогов внутри заданного корня.
@@ -83,7 +84,7 @@ final class ListDirTool implements Tool
             }
 
             $size = @filesize($full);
-            $files[] = $name . ' (' . $this->human($size === false ? 0 : $size) . ')';
+            $files[] = $name . ' (' . Bytes::human($size === false ? 0 : $size) . ')';
         }
 
         $all = array_merge($dirs, $files);
@@ -99,16 +100,5 @@ final class ListDirTool implements Tool
         return $text;
     }
 
-    private function human(int $bytes): string
-    {
-        if ($bytes >= 1048576) {
-            return round($bytes / 1048576, 1) . ' МБ';
-        }
-
-        if ($bytes >= 1024) {
-            return round($bytes / 1024, 1) . ' КБ';
-        }
-
-        return $bytes . ' Б';
-    }
 }
+

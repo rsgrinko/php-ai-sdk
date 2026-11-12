@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace AiSdk\Tools;
 
 use AiSdk\Tool;
+use AiSdk\Tools\Support\AtomicWriter;
 
 /**
  * Точечная замена в файле: старый фрагмент -> новый.
@@ -94,7 +95,7 @@ final class ReplaceInFileTool implements Tool
             : $this->replaceOnce($content, $search, $replace);
 
         try {
-            $this->sandbox->writeAtomic($file, $updated);
+            AtomicWriter::write($file, $updated);
         } catch (\RuntimeException $e) {
             return $e->getMessage();
         }
@@ -118,3 +119,4 @@ final class ReplaceInFileTool implements Tool
         return substr_replace($content, $replace, $position, strlen($search));
     }
 }
+

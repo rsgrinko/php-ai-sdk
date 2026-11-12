@@ -4,8 +4,9 @@ declare(strict_types=1);
 
 namespace AiSdk\Tools;
 
-use AiSdk\Http;
+use AiSdk\HttpTransport;
 use AiSdk\HttpRequest;
+use AiSdk\Tools\Support\UrlGuard;
 use AiSdk\Tool;
 
 /**
@@ -28,6 +29,7 @@ final class HttpRequestTool implements Tool
 
     /** @var array<string, array<string, string>> креды по хосту (в нижнем регистре) */
     private readonly array $auth;
+    private readonly UrlGuard $guard;
 
     /**
      * @param array<string, array<string, string>> $auth креды по хосту:
@@ -46,6 +48,7 @@ final class HttpRequestTool implements Tool
         }
 
         $this->auth = $normalized;
+        $this->guard = new UrlGuard($allowPrivate);
     }
 
     public function name(): string
@@ -143,9 +146,9 @@ final class HttpRequestTool implements Tool
             $response = null;
 
             for ($hop = 0; $hop <= self::MAX_REDIRECTS; $hop++) {
-                $this->assertAllowed($url);
+                $this->guard->assertAllowed($url);
 
-                $response = Http::request(
+                $response = HttpTransport::request(
                     $url,
                     self::TIMEOUT,
                     false,
@@ -167,7 +170,7 @@ final class HttpRequestTool implements Tool
                         . '. Повтори запрос по этому адресу, если он нужен.';
                 }
 
-                $url = $this->normalize($this->absolute($url, $response['location']));
+                $url = HttpRequest::normalizeUrl(HttpRequest::resolveRedirect($url, $response['location']));
             }
         } catch (\Throwable $e) {
             return 'Ошибка: ' . $e->getMessage();
@@ -219,106 +222,8 @@ final class HttpRequestTool implements Tool
         return $this->auth[$host] ?? null;
     }
 
-    private function assertAllowed(string $url): void
-    {
-        $parts = parse_url($url);
 
-        if ($parts === false || !isset($parts['scheme'], $parts['host'])) {
-            throw new \RuntimeException('некорректный URL');
-        }
 
-        $scheme = strtolower((string) $parts['scheme']);
 
-        if (!in_array($scheme, ['http', 'https'], true)) {
-            throw new \RuntimeException('разрешены только http и https');
-        }
-
-        if ($this->allowPrivate) {
-            return;
-        }
-
-        $host = strtolower((string) $parts['host']);
-
-        if ($host === 'localhost' || str_ends_with($host, '.local') || str_contains($host, 'metadata')) {
-            throw new \RuntimeException('запрос к локальному адресу запрещён');
-        }
-
-        $ips = [];
-
-        if (filter_var($host, FILTER_VALIDATE_IP) !== false) {
-            $ips[] = $host;
-        } else {
-            $resolved = @gethostbynamel($host);
-
-            if ($resolved === false || $resolved === []) {
-                throw new \RuntimeException('не удалось разрешить хост: ' . $host);
-            }
-
-            $ips = $resolved;
-        }
-
-        foreach ($ips as $ip) {
-            if (!$this->isPublicIp($ip)) {
-                throw new \RuntimeException('запрос к приватному адресу запрещён: ' . $host);
-            }
-        }
-    }
-
-    private function isPublicIp(string $ip): bool
-    {
-        if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false) {
-            return false;
-        }
-
-        // 100.64.0.0/10 (CGNAT) не покрывается флагами PHP.
-        if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false) {
-            $long = ip2long($ip);
-            $cgnat = ip2long('100.64.0.0');
-
-            if ($long !== false && $cgnat !== false && ($long & 0xFFC00000) === ($cgnat & 0xFFC00000)) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    private function normalize(string $url): string
-    {
-        $url = trim($url);
-
-        if (preg_match('#^[a-z][a-z0-9+.-]*://#i', $url) === 1) {
-            return $url;
-        }
-
-        return 'https://' . ltrim($url, '/');
-    }
-
-    private function absolute(string $base, string $location): string
-    {
-        if (preg_match('#^https?://#i', $location) === 1) {
-            return $location;
-        }
-
-        $parts = parse_url($base);
-
-        if ($parts === false || !isset($parts['scheme'], $parts['host'])) {
-            throw new \RuntimeException('некорректный адрес редиректа');
-        }
-
-        $origin = $parts['scheme'] . '://' . $parts['host']
-            . (isset($parts['port']) ? ':' . $parts['port'] : '');
-
-        if (str_starts_with($location, '//')) {
-            return $parts['scheme'] . ':' . $location;
-        }
-
-        if (str_starts_with($location, '/')) {
-            return $origin . $location;
-        }
-
-        $dir = rtrim(dirname($parts['path'] ?? '/'), '/');
-
-        return $origin . $dir . '/' . $location;
-    }
 }
+

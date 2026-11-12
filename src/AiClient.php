@@ -83,12 +83,22 @@ final class AiClient implements ChatClient
 
         $body = array_merge($body, $this->extraBody);
 
-        [$raw, $status, $error] = $this->post($body);
+        // Транспорт живёт в Http: TLS, CAINFO, таймауты и ошибки — в одном месте.
+        $response = HttpTransport::request(
+            url: rtrim($this->baseUrl, '/') . '/chat/completions',
+            timeout: $this->timeout,
+            follow: false,
+            maxBytes: 1048576,
+            method: 'POST',
+            headers: $this->requestHeaders(),
+            body: (string) json_encode(
+                $body,
+                JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE
+            ),
+        );
 
-        if ($raw === null) {
-            throw new AiException('Ошибка сети: ' . $error . $this->tlsHint($error));
-        }
-
+        $status = $response['status'];
+        $raw = $response['body'];
         $data = json_decode($raw, true);
 
         if (!is_array($data)) {
@@ -123,6 +133,24 @@ final class AiClient implements ChatClient
             usage: is_array($data['usage'] ?? null) ? $data['usage'] : [],
             raw: $data,
         );
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function requestHeaders(): array
+    {
+        $headers = [
+            'Content-Type' => 'application/json',
+            'Accept' => 'application/json',
+            'Expect' => '',
+        ];
+
+        if ($this->apiKey !== '') {
+            $headers['Authorization'] = 'Bearer ' . $this->apiKey;
+        }
+
+        return $headers;
     }
 
     /**
@@ -186,86 +214,6 @@ final class AiClient implements ChatClient
         // Имя конкретного инструмента -> объект.
         return ['type' => 'function', 'function' => ['name' => $choice]];
     }
-
-    /**
-     * Подсказка при типовой ошибке TLS на Windows.
-     */
-    private function tlsHint(string $error): string
-    {
-        if (!$this->verifySsl) {
-            return '';
-        }
-
-        if (!str_contains($error, 'certificate') && !str_contains($error, 'SSL')) {
-            return '';
-        }
-
-        return ' Подсказка: укажите путь к корневым сертификатам в AI_CAINFO '
-            . 'или временно поставьте AI_VERIFY_SSL=false (только локально).';
-    }
-
-    /**
-     * @param array<string, mixed> $body
-     * @return array{0: string|null, 1: int, 2: string|null} тело, HTTP-код, ошибка
-     */
-    private function post(array $body): array
-    {
-        $url = rtrim($this->baseUrl, '/') . '/chat/completions';
-
-        $headers = [
-            'Content-Type: application/json',
-            'Accept: application/json',
-            'Expect:',
-        ];
-
-        if ($this->apiKey !== '') {
-            $headers[] = 'Authorization: Bearer ' . $this->apiKey;
-        }
-
-        $payload = json_encode(
-            $body,
-            JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE
-        );
-
-        if ($payload === false) {
-            return [null, 0, 'не удалось сериализовать запрос в JSON'];
-        }
-
-        $ch = curl_init($url);
-
-        if ($ch === false) {
-            return [null, 0, 'не удалось создать cURL-дескриптор'];
-        }
-
-        $options = [
-            CURLOPT_POST => true,
-            CURLOPT_POSTFIELDS => $payload,
-            CURLOPT_HTTPHEADER => $headers,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT_MS => (int) round($this->timeout * 1000),
-            CURLOPT_CONNECTTIMEOUT_MS => 5000,
-            // AI_VERIFY_SSL=false отключает проверку цепочки и имени хоста.
-            CURLOPT_SSL_VERIFYPEER => $this->verifySsl,
-            CURLOPT_SSL_VERIFYHOST => $this->verifySsl ? 2 : 0,
-            CURLOPT_FOLLOWLOCATION => false,
-        ];
-
-        // Свой CA-бандл: актуально для Windows, где у PHP нет системных корней.
-        if ($this->caInfo !== '') {
-            $options[CURLOPT_CAINFO] = $this->caInfo;
-        }
-
-        curl_setopt_array($ch, $options);
-
-        $raw = curl_exec($ch);
-        $status = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
-        $error = curl_error($ch);
-        curl_close($ch);
-
-        if ($raw === false) {
-            return [null, $status, $error !== '' ? $error : 'неизвестная ошибка cURL'];
-        }
-
-        return [(string) $raw, $status, null];
-    }
 }
+
+

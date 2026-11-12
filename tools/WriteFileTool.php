@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace AiSdk\Tools;
 
 use AiSdk\Tool;
+use AiSdk\Tools\Support\AtomicWriter;
 
 /**
  * Создание и перезапись файла внутри песочницы.
@@ -76,7 +77,7 @@ final class WriteFileTool implements Tool
             }
 
             $existed = is_file($target);
-            $this->sandbox->writeAtomic($target, $content);
+            AtomicWriter::write($target, $content);
         } catch (\RuntimeException $e) {
             return $e->getMessage();
         }
@@ -86,3 +87,4 @@ final class WriteFileTool implements Tool
             . ': ' . strlen($content) . ' Б.';
     }
 }
+

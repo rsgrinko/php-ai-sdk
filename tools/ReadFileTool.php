@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace AiSdk\Tools;
 
 use AiSdk\Tool;
+use AiSdk\Tools\Support\Bytes;
 
 /**
  * Чтение текстового файла внутри заданного корня.
@@ -84,7 +85,7 @@ final class ReadFileTool implements Tool
         }
 
         if ($size > 10 * 1024 * 1024) {
-            return 'Файл слишком большой (' . $this->human($size) . '). Читай частями через offset и limit.';
+            return 'Файл слишком большой (' . Bytes::human($size) . '). Читай частями через offset и limit.';
         }
 
         $handle = fopen($file, 'rb');
@@ -101,7 +102,7 @@ final class ReadFileTool implements Tool
         }
 
         if ($first !== '' && !mb_check_encoding($first, 'UTF-8')) {
-            return 'Файл бинарный (' . $this->human($size) . '), не читаю.';
+            return 'Файл бинарный (' . Bytes::human($size) . '), не читаю.';
         }
 
         $lines = file($file, FILE_IGNORE_NEW_LINES);
@@ -129,16 +130,5 @@ final class ReadFileTool implements Tool
         return 'Файл ' . $path . ', строки ' . $from . '–' . $to . ' из ' . $total . ":\n" . $text;
     }
 
-    private function human(int $bytes): string
-    {
-        if ($bytes >= 1048576) {
-            return round($bytes / 1048576, 1) . ' МБ';
-        }
-
-        if ($bytes >= 1024) {
-            return round($bytes / 1024, 1) . ' КБ';
-        }
-
-        return $bytes . ' Б';
-    }
 }
+

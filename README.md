@@ -84,7 +84,7 @@ src/
   LoggingClient.php    декоратор: логи запросов и ответов
   Tool.php             интерфейс инструмента
   ToolRegistry.php     набор инструментов
-  Http.php             низкоуровневый HTTP: методы, тело, лимит размера
+  HttpTransport.php    низкоуровневый HTTP: методы, тело, лимит размера
   HttpRequest.php      сборка запроса: query, body, заголовки, Basic/Bearer
   Env.php              .env без зависимостей
   AiException.php      ошибки
@@ -108,6 +108,7 @@ tools/
   DateCalcTool.php     разница дат и прибавление интервала
   UuidTool.php         UUID v4
   HashTool.php         sha256/sha1/md5
+  Support/             общие помощники: Bytes, FileWalker, UrlGuard, AtomicWriter
 examples/
   01-chat.php          простой вопрос
   02-tools.php         агент с тремя инструментами
@@ -121,7 +122,9 @@ examples/
   10-http.php          HTTP: запрос, SSRF, allowPrivate
   11-json.php          инструменты без модели
   12-logging.php       логирование запросов к модели
-tests/run.php          тесты без сети
+tests/run.php          раннер тестов
+tests/support.php      помощники, заглушки, FakeClient
+tests/cases/           тесты по темам (agent, files, http, shell, ...)
 ```
 
 ## Как это работает
@@ -530,7 +533,7 @@ curl http://10.10.10.77:8080/v1/models
 php tests/run.php
 ```
 
-97 проверок: калькулятор, время, реестр, обрезка результатов, весь цикл агента,
+100 проверок: калькулятор, время, реестр, обрезка результатов, весь цикл агента,
 настройки (tool_choice, подтверждение вызовов, история), finish, файлы
 (чтение, запись, замена, поиск, побег из песочницы, свободный режим), CSV,
 единицы, даты, uuid/хеши, сборка HTTP-запроса (методы, тело, заголовки,
@@ -639,10 +642,12 @@ $tools->add(new FinishTool());
 Если хочется проверить весь цикл, не тратя токены:
 
 ```php
-$agent = new Agent($fakeClient, $tools);   // ChatClient из tests/run.php
+$agent = new Agent($fakeClient, $tools);   // ChatClient из tests/support.php
 $agent->ask('вопрос');
 ```
 
 ---
 
 Лицензия: делайте что хотите.
+
+
