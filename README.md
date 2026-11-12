@@ -21,6 +21,7 @@ echo $agent->ask('Который час в Москве и сколько буд
 - **`Tool` + `ToolRegistry`** — инструмент = 4 метода; реестр сам отдаёт
   схемы модели и вызывает нужный инструмент.
 - **`ChatClient`** — интерфейс, чтобы подменить модель заглушкой в тестах.
+- **`LoggingClient`** — декоратор: пишет каждый запрос, ответ, токены и время.
 - **18 готовых инструментов**: время, калькулятор, погода, файлы (чтение,
   запись, поиск), CSV, HTTP, единицы, даты, UUID, хеши, JSON, явное завершение
   и команды оболочки — см. [таблицу](#инструменты).
@@ -66,6 +67,7 @@ php examples/01-chat.php
 | `09-files.php` | файлы и поиск | `read_file`, `list_dir`, `write_file`, `replace_in_file`, `search_files`, `find_files` | песочница, `create_dirs`, `all` |
 | `10-http.php` | HTTP без сети | `http_request` | `allowPrivate`, `auth`, методы |
 | `11-json.php` | инструменты без модели | `json_query`, `convert_units`, `date_calc`, `uuid`, `hash_text` | — |
+| `12-logging.php` | логи запросов | `get_time`, `calculator` | `verbose`, `sink` |
 
 `10-http.php` и `11-json.php` работают без модели и без сети — их можно запускать
 где угодно. Остальные обращаются к модели из `.env`.
@@ -79,6 +81,7 @@ src/
   ChatClient.php       интерфейс (для тестов)
   ChatResult.php       ответ модели: текст, tool_calls, usage
   Agent.php            цикл: вопрос → инструменты → ответ
+  LoggingClient.php    декоратор: логи запросов и ответов
   Tool.php             интерфейс инструмента
   ToolRegistry.php     набор инструментов
   Http.php             низкоуровневый HTTP: методы, тело, лимит размера
@@ -117,6 +120,7 @@ examples/
   09-files.php         файлы и поиск
   10-http.php          HTTP: запрос, SSRF, allowPrivate
   11-json.php          инструменты без модели
+  12-logging.php       логирование запросов к модели
 tests/run.php          тесты без сети
 ```
 
@@ -185,6 +189,34 @@ $agent = new Agent(
 ```php
 $agent = Agent::fromEnv($tools, 'Отвечай кратко.');
 ```
+
+## Логирование
+
+`LoggingClient` — обычный декоратор над любым `ChatClient`:
+
+```php
+$client = new LoggingClient(
+    inner: AiClient::fromEnv(),
+    sink: fn (string $line) => error_log($line),  // null — error_log() по умолчанию
+    verbose: true,                                 // печатать сообщения и инструменты
+);
+
+$agent = new Agent($client, $tools);
+```
+
+Один раунд выглядит так:
+
+```
+LLM → 2 сообщ., 2 инструментов
+   [0] system: Отвечай кратко
+   [1] user: Который час?
+   инструменты: get_time, calculator
+LLM ← tool_calls: get_time, calculator, 6084 мс, токены 377/44
+```
+
+Без `verbose` остаётся одна строка на запрос — этого достаточно для продакшена.
+Ошибки пишутся строкой `LLM ✗` и **пробрасываются дальше**: декоратор ничего
+не глотает.
 
 ## Инструменты
 
@@ -498,12 +530,12 @@ curl http://10.10.10.77:8080/v1/models
 php tests/run.php
 ```
 
-93 проверки: калькулятор, время, реестр, обрезка результатов, весь цикл агента,
+97 проверок: калькулятор, время, реестр, обрезка результатов, весь цикл агента,
 настройки (tool_choice, подтверждение вызовов, история), finish, файлы
 (чтение, запись, замена, поиск, побег из песочницы, свободный режим), CSV,
 единицы, даты, uuid/хеши, сборка HTTP-запроса (методы, тело, заголовки,
 Basic/Bearer), защита от SSRF, run_command (код выхода, таймаут, allowlist,
-обрезка)
+обрезка), логирование запросов
 (успех, ошибка инструмента, лимит раундов, история). Сеть не нужна — модель
 подменяется `FakeClient` из `tests/run.php`.
 
@@ -560,6 +592,9 @@ $client = AiClient::fromEnv();
 $result = $client->chat($messages, $tools = [], $options = []);
 // options: tool_choice, parallel_tool_calls, temperature, max_tokens
 $result->text; $result->toolCalls; $result->usage;
+
+// Логирование поверх любого клиента
+$client = new LoggingClient($client, sink: fn (string $l) => error_log($l), verbose: true);
 
 // Агент
 $agent = new Agent(
