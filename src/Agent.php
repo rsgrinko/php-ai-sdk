@@ -27,6 +27,7 @@ use AiSdk\Tools\TimeTool;
  *       parallelToolCalls: true,   // разрешить модели батчить вызовы
  *       historyLimit: 40,          // сколько сообщений держать (0 — без лимита)
  *       toolApproval: fn ($name, $args) => $name !== 'drop_database',
+ *       finishTool: 'finish',      // имя инструмента-финиша ('' — отключить)
  *   );
  */
 final class Agent
@@ -66,6 +67,7 @@ final class Agent
         private readonly bool $parallelToolCalls = true,
         private readonly int $historyLimit = 40,
         private readonly ?\Closure $toolApproval = null,
+        private readonly string $finishTool = 'finish',
     ) {
         $this->systemPrompt = $systemPrompt;
     }
@@ -85,6 +87,7 @@ final class Agent
             toolChoice: Env::get('AI_TOOL_CHOICE', 'auto') ?? 'auto',
             parallelToolCalls: Env::bool('AI_PARALLEL_TOOL_CALLS', true),
             historyLimit: Env::int('AI_HISTORY_LIMIT', 40),
+            finishTool: Env::get('AI_FINISH_TOOL', 'finish') ?? 'finish',
         );
     }
 
@@ -134,8 +137,10 @@ final class Agent
             // не примет следующие за ним tool-сообщения.
             $this->messages[] = $result->assistantMessage;
 
-            foreach ($result->toolCalls as $call) {
-                $this->messages[] = $this->runTool($call);
+            $finished = $this->runToolCalls($result->toolCalls);
+
+            if ($finished !== null) {
+                return $this->finish($finished);
             }
 
             $result = $this->chat(false);
@@ -219,6 +224,92 @@ final class Agent
             'tool_call_id' => $call['id'],
             'content' => $output,
         ];
+    }
+
+    /**
+     * Выполнить пачку вызовов. Если среди них был finish — вернуть его
+     * результат: ход на этом заканчивается.
+     *
+     * @param list<array{id: string, name: string, arguments: array<string, mixed>}> $calls
+     */
+    private function runToolCalls(array $calls): ?string
+    {
+        $finished = null;
+
+        foreach ($calls as $call) {
+            if ($finished !== null) {
+                // Работа уже завершена, но API требует ответ на каждый
+                // tool_call_id — иначе история станет невалидной.
+                $this->messages[] = [
+                    'role' => 'tool',
+                    'tool_call_id' => $call['id'],
+                    'content' => 'Пропущено: работа уже завершена.',
+                ];
+
+                continue;
+            }
+
+            if ($this->isFinishCall($call)) {
+                $finished = $this->finishResult($call);
+
+                $this->trace[] = [
+                    'name' => $call['name'],
+                    'arguments' => $call['arguments'],
+                    'output' => $finished,
+                    'ms' => 0,
+                    'blocked' => false,
+                ];
+
+                $this->messages[] = [
+                    'role' => 'tool',
+                    'tool_call_id' => $call['id'],
+                    'content' => 'ok',
+                ];
+
+                continue;
+            }
+
+            $this->messages[] = $this->runTool($call);
+        }
+
+        return $finished;
+    }
+
+    /**
+     * @param array{id: string, name: string, arguments: array<string, mixed>} $call
+     */
+    private function isFinishCall(array $call): bool
+    {
+        return $this->finishTool !== ''
+            && $call['name'] === $this->finishTool
+            && $this->tools->has($this->finishTool);
+    }
+
+    /**
+     * Достать финальный текст из аргументов finish.
+     *
+     * @param array{id: string, name: string, arguments: array<string, mixed>} $call
+     */
+    private function finishResult(array $call): string
+    {
+        // result — как в схеме; остальные — на случай, если модель назовёт по-своему.
+        foreach (['result', 'answer', 'summary', 'text', 'output'] as $key) {
+            $value = $call['arguments'][$key] ?? null;
+
+            if (is_scalar($value) && trim((string) $value) !== '') {
+                return trim((string) $value);
+            }
+        }
+
+        return '';
+    }
+
+    private function finish(string $result): string
+    {
+        $text = $result !== '' ? $result : '(модель завершила работу без результата)';
+        $this->messages[] = ['role' => 'assistant', 'content' => $text];
+
+        return $text;
     }
 
     /**

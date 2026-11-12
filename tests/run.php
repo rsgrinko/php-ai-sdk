@@ -20,6 +20,7 @@ use AiSdk\ChatResult;
 use AiSdk\Tool;
 use AiSdk\ToolRegistry;
 use AiSdk\Tools\CalculatorTool;
+use AiSdk\Tools\FinishTool;
 use AiSdk\Tools\TimeTool;
 
 mb_internal_encoding('UTF-8');
@@ -124,6 +125,36 @@ function toolCall(string $name, array $arguments, string $id = 'call_1'): ChatRe
 function textResult(string $text): ChatResult
 {
     return new ChatResult($text, [], ['role' => 'assistant', 'content' => $text]);
+}
+
+/**
+ * Ответ модели с несколькими вызовами сразу.
+ *
+ * @param list<array{name: string, arguments: array<string, mixed>, id: string}> $calls
+ */
+function toolCalls(array $calls): ChatResult
+{
+    $message = ['role' => 'assistant', 'content' => '', 'tool_calls' => []];
+    $parsed = [];
+
+    foreach ($calls as $call) {
+        $message['tool_calls'][] = [
+            'id' => $call['id'],
+            'type' => 'function',
+            'function' => [
+                'name' => $call['name'],
+                'arguments' => json_encode($call['arguments'], JSON_UNESCAPED_UNICODE),
+            ],
+        ];
+
+        $parsed[] = [
+            'id' => $call['id'],
+            'name' => $call['name'],
+            'arguments' => $call['arguments'],
+        ];
+    }
+
+    return new ChatResult('', $parsed, $message);
 }
 
 // ---------------------------------------------------------------------------
@@ -515,6 +546,101 @@ test('агент: reset очищает историю и трассировку'
 
     assertSame([], $agent->messages());
     assertSame([], $agent->trace());
+});
+
+// ---------------------------------------------------------------------------
+// Завершение через finish
+// ---------------------------------------------------------------------------
+
+test('finish: возвращает result и не делает лишний запрос', function (): void {
+    $client = new FakeClient([
+        toolCalls([['name' => 'finish', 'arguments' => ['result' => 'готово'], 'id' => 'f1']]),
+    ]);
+
+    $agent = new Agent(
+        $client,
+        (new ToolRegistry())->add(new FinishTool()),
+        'ты тестовый',
+        3,
+    );
+
+    assertSame('готово', $agent->ask('сделай'));
+    assertSame(1, count($client->requests), 'после finish второго запроса быть не должно');
+    assertSame('finish', $agent->trace()[0]['name']);
+
+    $last = $agent->messages()[count($agent->messages()) - 1];
+    assertSame('assistant', $last['role']);
+    assertSame('готово', $last['content']);
+});
+
+test('finish: остальные вызовы из того же ответа получают ответ', function (): void {
+    $client = new FakeClient([
+        toolCalls([
+            ['name' => 'calculator', 'arguments' => ['expression' => '2+2'], 'id' => 'c1'],
+            ['name' => 'finish', 'arguments' => ['result' => '4'], 'id' => 'f1'],
+        ]),
+    ]);
+
+    $agent = new Agent(
+        $client,
+        (new ToolRegistry())->add(new CalculatorTool(), new FinishTool()),
+        'ты тестовый',
+        3,
+    );
+
+    assertSame('4', $agent->ask('посчитай'));
+
+    // История должна остаться валидной: у каждого tool_call_id есть tool-ответ.
+    $messages = $agent->messages();
+    $answered = [];
+
+    foreach ($messages as $message) {
+        if (($message['role'] ?? '') === 'tool') {
+            $answered[] = $message['tool_call_id'];
+        }
+    }
+
+    assertSame(['c1', 'f1'], $answered);
+    assertSame('2+2 = 4', $messages[3]['content'], 'калькулятор должен выполниться до finish');
+});
+
+test('finish: без result возвращает понятную заглушку', function (): void {
+    $client = new FakeClient([
+        toolCalls([['name' => 'finish', 'arguments' => [], 'id' => 'f1']]),
+    ]);
+
+    $agent = new Agent($client, (new ToolRegistry())->add(new FinishTool()), 'тест', 3);
+
+    assertContains('без результата', $agent->ask('сделай'));
+});
+
+test('finish: незарегистрированный инструмент не перехватывается', function (): void {
+    $client = new FakeClient([
+        toolCall('finish', ['result' => 'x'], 'f1'),
+        textResult('продолжил'),
+    ]);
+
+    $agent = new Agent($client, new ToolRegistry(), 'тест', 3);
+
+    assertSame('продолжил', $agent->ask('сделай'));
+    assertContains('неизвестный инструмент', $agent->trace()[0]['output']);
+});
+
+test('finish: можно отключить перехват через finishTool', function (): void {
+    $client = new FakeClient([
+        toolCall('finish', ['result' => 'x'], 'f1'),
+        textResult('обычный ответ'),
+    ]);
+
+    $agent = new Agent(
+        client: $client,
+        tools: (new ToolRegistry())->add(new FinishTool()),
+        systemPrompt: 'тест',
+        maxRounds: 3,
+        finishTool: '',
+    );
+
+    assertSame('обычный ответ', $agent->ask('сделай'));
 });
 
 // ---------------------------------------------------------------------------
