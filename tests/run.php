@@ -1226,6 +1226,64 @@ test('json_query: битый JSON', function (): void {
 });
 
 // ---------------------------------------------------------------------------
+// Песочница: ограниченный и свободный режимы
+// ---------------------------------------------------------------------------
+
+test('sandbox: по умолчанию ограничена', function (): void {
+    $dir = testDir();
+
+    assertTrue((new FileSandbox($dir))->isRestricted());
+    assertTrue(!FileSandbox::unrestricted($dir)->isRestricted());
+});
+
+test('sandbox: свободный режим читает вне корня', function (): void {
+    $dir = testDir();
+    $outside = str_replace('\\', '/', dirname($dir) . '/outside.txt');
+    file_put_contents($outside, 'снаружи');
+
+    $result = (new ReadFileTool(FileSandbox::unrestricted($dir)))->handle(['path' => $outside]);
+
+    assertContains('снаружи', $result);
+});
+
+test('sandbox: свободный режим пишет вне корня', function (): void {
+    $dir = testDir();
+    $outside = str_replace('\\', '/', dirname($dir) . '/written.txt');
+
+    $result = (new WriteFileTool(FileSandbox::unrestricted($dir)))->handle([
+        'path' => $outside,
+        'content' => 'записано',
+    ]);
+
+    assertContains('Создан', $result);
+    assertSame('записано', file_get_contents($outside));
+});
+
+test('sandbox: политика задаётся для каждого инструмента отдельно', function (): void {
+    $dir = testDir();
+    $outside = str_replace('\\', '/', dirname($dir) . '/mixed.txt');
+    file_put_contents($outside, 'данные');
+
+    // Читать можно везде...
+    $read = new ReadFileTool(FileSandbox::unrestricted($dir));
+    assertContains('данные', $read->handle(['path' => $outside]));
+
+    // ...а писать — только в корень.
+    $write = new WriteFileTool(new FileSandbox($dir));
+    assertContains('запрещены', $write->handle(['path' => $outside, 'content' => 'x']));
+});
+
+test('sandbox: ограниченный режим по-прежнему блокирует выход', function (): void {
+    $dir = testDir();
+    $outside = dirname($dir) . '/blocked.txt';
+    file_put_contents($outside, 'секрет');
+
+    $result = (new ReadFileTool(new FileSandbox($dir)))->handle(['path' => '../blocked.txt']);
+
+    assertContains('не должен содержать', $result);
+});
+
+// ---------------------------------------------------------------------------
 // run_command: оболочка
 // ---------------------------------------------------------------------------
 

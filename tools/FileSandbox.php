@@ -5,17 +5,28 @@ declare(strict_types=1);
 namespace AiSdk\Tools;
 
 /**
- * Ограничитель файловых инструментов: любой путь обязан лежать внутри корня.
+ * Ограничитель файловых инструментов.
  *
- * Чтение проверяется через realpath, запись — через realpath каталога:
- * иначе «..» и симлинки уводили бы за пределы корня.
+ * По умолчанию любой путь обязан лежать внутри корня: чтение проверяется через
+ * realpath, запись — через realpath каталога. Иначе «..» и симлинки уводили бы
+ * за пределы корня.
+ *
+ * Ограничение можно снять — осознанно и точечно:
+ *
+ *   new ReadFileTool(FileSandbox::unrestricted());          // читать везде
+ *   new WriteFileTool(new FileSandbox(__DIR__ . '/data'));  // писать только в data
+ *
+ * Каждый инструмент получает свой экземпляр, поэтому политика задаётся
+ * для каждого инструмента отдельно.
  */
 final class FileSandbox
 {
     private string $root;
 
-    public function __construct(string $root)
-    {
+    public function __construct(
+        string $root,
+        private readonly bool $restricted = true,
+    ) {
         $resolved = realpath($root);
 
         if ($resolved === false || !is_dir($resolved)) {
@@ -25,33 +36,48 @@ final class FileSandbox
         $this->root = rtrim($resolved, DIRECTORY_SEPARATOR);
     }
 
+    /**
+     * Песочница без ограничений: абсолютные пути и «..» разрешены.
+     * Корень нужен только как база для относительных путей.
+     */
+    public static function unrestricted(string $root = ''): self
+    {
+        $base = $root !== '' ? $root : (string) getcwd();
+
+        return new self($base, false);
+    }
+
     public function root(): string
     {
         return $this->root;
     }
 
+    public function isRestricted(): bool
+    {
+        return $this->restricted;
+    }
+
     /**
      * Абсолютный путь к существующему файлу или каталогу.
      *
-     * @throws \RuntimeException если путь вне корня или не найден
+     * @throws \RuntimeException если путь вне корня (в ограниченном режиме) или не найден
      */
     public function resolve(string $path): string
     {
-        $relative = $this->normalize($path);
-
-        if ($relative === '') {
-            return $this->root;
-        }
-
-        $real = realpath($this->root . DIRECTORY_SEPARATOR . $relative);
+        $target = $this->absolutePath($path);
+        $real = realpath($target);
 
         if ($real === false) {
-            throw new \RuntimeException(
-                'Путь не найден: ' . $path . '. Нужен путь к файлу относительно корня, например src/app.php.'
-            );
+            $hint = $this->restricted
+                ? ' Нужен путь к файлу относительно корня, например src/app.php.'
+                : '';
+
+            throw new \RuntimeException('Путь не найден: ' . $path . '.' . $hint);
         }
 
-        $this->assertInside($real);
+        if ($this->restricted) {
+            $this->assertInside($real);
+        }
 
         return $real;
     }
@@ -64,40 +90,29 @@ final class FileSandbox
      */
     public function resolveForWrite(string $path, bool $createDirs = false): string
     {
-        $relative = $this->normalize($path);
-
-        if ($relative === '') {
-            throw new \RuntimeException('Не указан путь к файлу.');
-        }
-
-        $directory = dirname($relative);
-        $name = basename($relative);
+        $target = $this->absolutePath($path);
+        $directory = dirname($target);
+        $name = basename($target);
 
         if ($name === '' || $name === '.' || $name === '..') {
             throw new \RuntimeException('Некорректное имя файла.');
         }
 
-        $directoryPath = $directory === '.' || $directory === ''
-            ? $this->root
-            : $this->root . DIRECTORY_SEPARATOR . $directory;
-
-        if (!is_dir($directoryPath)) {
+        if (!is_dir($directory)) {
             if (!$createDirs) {
                 throw new \RuntimeException('Каталог не существует: ' . $directory);
             }
 
-            if (!@mkdir($directoryPath, 0777, true) && !is_dir($directoryPath)) {
+            if (!@mkdir($directory, 0777, true) && !is_dir($directory)) {
                 throw new \RuntimeException('Не удалось создать каталог: ' . $directory);
             }
         }
 
-        $realDirectory = realpath($directoryPath);
+        $realDirectory = realpath($directory) ?: $directory;
 
-        if ($realDirectory === false) {
-            throw new \RuntimeException('Каталог недоступен: ' . $directory);
+        if ($this->restricted) {
+            $this->assertInside($realDirectory);
         }
-
-        $this->assertInside($realDirectory);
 
         return $realDirectory . DIRECTORY_SEPARATOR . $name;
     }
@@ -138,7 +153,7 @@ final class FileSandbox
     }
 
     /**
-     * Путь для показа пользователю (относительно корня).
+     * Путь для показа пользователю (относительно корня, если внутри него).
      */
     public function relative(string $absolute): string
     {
@@ -146,41 +161,48 @@ final class FileSandbox
             return '.';
         }
 
-        $prefix = $this->root . DIRECTORY_SEPARATOR;
-
-        if ($this->startsWithRoot($absolute)) {
-            return str_replace(DIRECTORY_SEPARATOR, '/', substr($absolute, strlen($prefix)));
+        if (!$this->startsWithRoot($absolute)) {
+            return $absolute;
         }
 
-        return $absolute;
+        return str_replace(
+            DIRECTORY_SEPARATOR,
+            '/',
+            substr($absolute, strlen($this->root . DIRECTORY_SEPARATOR))
+        );
     }
 
     /**
-     * Относительный путь без «..», абсолютных путей и нулевых байтов.
+     * Привести путь к абсолютному. В ограниченном режиме абсолютные пути
+     * и «..» запрещены; в свободном — разрешены.
      */
-    private function normalize(string $path): string
+    private function absolutePath(string $path): string
     {
         $path = trim(str_replace('\\', '/', $path));
 
         if ($path === '' || $path === '.') {
-            return '';
+            return $this->root;
         }
 
         if (str_contains($path, "\0")) {
             throw new \RuntimeException('Некорректный путь.');
         }
 
-        if (str_starts_with($path, '/') || preg_match('/^[A-Za-z]:[\\\\\/]/', $path) === 1) {
-            throw new \RuntimeException('Абсолютные пути запрещены: указывайте путь относительно корня.');
+        $absolute = str_starts_with($path, '/') || preg_match('/^[A-Za-z]:\//', $path) === 1;
+
+        if ($absolute) {
+            if ($this->restricted) {
+                throw new \RuntimeException('Абсолютные пути запрещены: указывайте путь относительно корня.');
+            }
+
+            return rtrim($path, '/');
         }
 
-        $path = preg_replace('#/+#', '/', $path) ?? $path;
-
-        if (preg_match('#(^|/)\.\.(/|$)#', $path) === 1) {
+        if ($this->restricted && preg_match('#(^|/)\.\.(/|$)#', $path) === 1) {
             throw new \RuntimeException('Путь не должен содержать "..".');
         }
 
-        return trim($path, '/');
+        return $this->root . DIRECTORY_SEPARATOR . $path;
     }
 
     private function assertInside(string $real): void
