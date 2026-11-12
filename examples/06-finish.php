@@ -11,6 +11,9 @@ declare(strict_types=1);
  *      лежит в аргументе result, а не в свободном тексте.
  *   2. Работа + завершение: сначала калькулятор, потом finish.
  *
+ * Инструменты: finish, calculator.
+ * Флаги: toolChoice=required, finishTool=finish.
+ *
  * Запуск:
  *   php examples/06-finish.php
  */
@@ -63,3 +66,4 @@ foreach ($worker->trace() as $step) {
     echo '   ' . $step['name'] . '(' . json_encode($step['arguments'], JSON_UNESCAPED_UNICODE) . ')'
         . ' → ' . $step['output'] . PHP_EOL;
 }
+

@@ -9,6 +9,9 @@ declare(strict_types=1);
  * процесса. Регистрируйте его только там, где это действительно нужно,
  * и по возможности ограничивайте allowlist и рабочим каталогом.
  *
+ * Инструменты: run_command.
+ * Флаги: workdir, shell, timeout, maxOutput, allow, tmpDir.
+ *
  * Запуск:
  *   php examples/08-shell.php
  */
@@ -29,3 +32,4 @@ echo $shell->handle(['command' => 'echo shell works']) . PHP_EOL . PHP_EOL;
 $limited = new ShellTool(allow: ['php'], timeout: 3.0, tmpDir: $tmpDir);
 
 echo $limited->handle(['command' => 'echo это запрещено']) . PHP_EOL;
+

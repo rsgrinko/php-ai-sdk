@@ -8,6 +8,9 @@ declare(strict_types=1);
  * Класс ниже — шаблон: скопируйте, переименуйте и поменяйте name/description/
  * parameters/handle. Регистрация — одна строка через $tools->add(...).
  *
+ * Инструменты: server_info — свой инструмент.
+ * Флаги: нет; инструмент реализует контракт Tool.
+ *
  * Запуск:
  *   php examples/03-custom-tool.php
  */
@@ -101,3 +104,4 @@ foreach ($agent->trace() as $step) {
     echo PHP_EOL . 'инструмент: ' . $step['name'] . ' ' . json_encode($step['arguments'], JSON_UNESCAPED_UNICODE) . PHP_EOL;
     echo $step['output'] . PHP_EOL;
 }
+

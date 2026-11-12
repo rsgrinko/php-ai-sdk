@@ -85,7 +85,8 @@ final class JsonQueryTool implements Tool
                 continue;
             }
 
-            return 'Путь ' . $path . ' не найден: нет ключа "' . $token . '".';
+            return 'Путь ' . $path . ' не найден: нет '
+                . (ctype_digit($token) ? 'элемента [' . $token . ']' : 'ключа "' . $token . '"') . '.';
         }
 
         if (is_scalar($current) || $current === null) {

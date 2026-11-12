@@ -5,6 +5,9 @@ declare(strict_types=1);
 /**
  * Пример 1. Простой вопрос к модели — без инструментов.
  *
+ * Инструменты: нет — простой чат.
+ * Флаги: нет.
+ *
  * Запуск:
  *   php examples/01-chat.php
  */
@@ -27,3 +30,4 @@ if ($result->usage !== []) {
         . ($result->usage['prompt_tokens'] ?? 0) . ' → '
         . ($result->usage['completion_tokens'] ?? 0) . PHP_EOL;
 }
+

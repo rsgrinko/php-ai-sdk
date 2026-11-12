@@ -8,6 +8,9 @@ declare(strict_types=1);
  * Эти инструменты не требуют ни ключей, ни настроек — их можно
  * зарегистрировать и сразу спрашивать.
  *
+ * Инструменты: convert_units, date_calc, uuid, hash_text.
+ * Флаги: нет.
+ *
  * Запуск:
  *   php examples/07-tools.php
  */
@@ -42,3 +45,4 @@ foreach ($agent->trace() as $step) {
     echo '  ' . $step['name'] . '(' . json_encode($step['arguments'], JSON_UNESCAPED_UNICODE) . ')'
         . ' → ' . mb_substr($step['output'], 0, 100) . PHP_EOL;
 }
+

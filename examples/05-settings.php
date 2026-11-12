@@ -10,6 +10,9 @@ declare(strict_types=1);
  *   - toolApproval: запретить опасный вызов и посмотреть, что ответит модель;
  *   - historyLimit: ограничение истории (здесь просто печатаем размер).
  *
+ * Инструменты: get_time, calculator.
+ * Флаги: toolChoice=required, toolApproval, maxRounds, historyLimit.
+ *
  * Запуск:
  *   php examples/05-settings.php
  */
@@ -67,3 +70,4 @@ $memory = new Agent($client, $tools, 'Отвечай одним словом.', 
 $memory->ask('Меня зовут Роман.');
 $memory->ask('Как меня зовут?');
 echo '   сообщений в истории: ' . count($memory->messages()) . ' (лимит 40)' . PHP_EOL;
+

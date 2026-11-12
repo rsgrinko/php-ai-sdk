@@ -36,8 +36,11 @@ final class AiClient implements ChatClient
     /**
      * Собрать клиент из .env. Все параметры необязательны, кроме ключа
      * для закрытых провайдеров.
+     *
+     * @param float|null $timeout переопределить AI_TIMEOUT: на локальных моделях
+     *                            большой набор инструментов замедляет ответ.
      */
-    public static function fromEnv(): self
+    public static function fromEnv(?float $timeout = null): self
     {
         $extraBody = [];
 
@@ -50,7 +53,7 @@ final class AiClient implements ChatClient
             apiKey: Env::get('AI_API_KEY', '') ?? '',
             model: Env::get('AI_MODEL', 'deepseek-chat') ?? 'deepseek-chat',
             baseUrl: Env::get('AI_BASE_URL', 'https://api.deepseek.com') ?? 'https://api.deepseek.com',
-            timeout: Env::float('AI_TIMEOUT', 30.0),
+            timeout: $timeout ?? Env::float('AI_TIMEOUT', 30.0),
             temperature: Env::float('AI_TEMPERATURE', 0.7),
             maxTokens: Env::int('AI_MAX_TOKENS', 1000),
             extraBody: $extraBody,

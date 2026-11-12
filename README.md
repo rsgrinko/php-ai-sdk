@@ -48,6 +48,29 @@ php examples/01-chat.php
 
 Дальше — `php examples/02-tools.php`: там модель уже вызывает инструменты.
 
+## Примеры
+
+Каждый пример начинается с заголовка «Инструменты / Флаги» — по нему видно,
+что именно зарегистрировано и какие настройки включены.
+
+| Файл | Что показывает | Инструменты | Флаги |
+|---|---|---|---|
+| `01-chat.php` | простой ответ | — | — |
+| `02-tools.php` | цикл вызова инструментов | `get_time`, `calculator`, `get_weather` | значения по умолчанию |
+| `03-custom-tool.php` | свой инструмент с нуля | `server_info` | — |
+| `04-cli.php` | диалог в терминале | `get_time`, `calculator`, `get_weather` | — |
+| `05-settings.php` | настройки агента | `get_time`, `calculator` | `toolChoice`, `toolApproval`, `historyLimit` |
+| `06-finish.php` | явное завершение | `finish`, `calculator` | `toolChoice=required`, `finishTool` |
+| `07-tools.php` | прикладные утилиты | `convert_units`, `date_calc`, `uuid`, `hash_text` | — |
+| `08-shell.php` | команды оболочки | `run_command` | `workdir`, `shell`, `timeout`, `maxOutput`, `allow`, `tmpDir` |
+| `09-files.php` | файлы и поиск | `read_file`, `list_dir`, `write_file`, `replace_in_file`, `search_files`, `find_files` | песочница, `create_dirs`, `all` |
+| `10-http.php` | HTTP без сети | `http_request` | `allowPrivate`, `auth`, методы |
+| `11-json.php` | инструменты без модели | `json_query`, `convert_units`, `date_calc`, `uuid`, `hash_text` | — |
+| `12-all-tools.php` | полный набор | все 18 | песочница, `allow`, `toolApproval`, `timeout` |
+
+`10-http.php` и `11-json.php` работают без модели и без сети — их можно запускать
+где угодно. Остальные обращаются к модели из `.env`.
+
 ## Структура
 
 ```
@@ -92,6 +115,10 @@ examples/
   06-finish.php        завершение через finish
   07-tools.php         единицы, даты, uuid, хеш
   08-shell.php         команды оболочки
+  09-files.php         файлы и поиск
+  10-http.php          HTTP: запрос, SSRF, allowPrivate
+  11-json.php          инструменты без модели
+  12-all-tools.php     полный набор и все флаги
 tests/run.php          тесты без сети
 ```
 

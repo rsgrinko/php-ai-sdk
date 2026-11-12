@@ -8,6 +8,9 @@ declare(strict_types=1);
  * История диалога живёт в памяти процесса: агент помнит предыдущие реплики.
  * Команды: /reset — начать заново, /quit — выход.
  *
+ * Инструменты: get_time, calculator, get_weather.
+ * Флаги: нет; история живёт в памяти процесса.
+ *
  * Запуск:
  *   php examples/04-cli.php
  */
@@ -66,3 +69,4 @@ while (true) {
         echo 'Ошибка: ' . $e->getMessage() . PHP_EOL;
     }
 }
+
