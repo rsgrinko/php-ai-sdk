@@ -26,13 +26,18 @@ use AiSdk\Tools\ConvertUnitsTool;
 use AiSdk\Tools\CsvQueryTool;
 use AiSdk\Tools\DateCalcTool;
 use AiSdk\Tools\FileSandbox;
+use AiSdk\Tools\FindFilesTool;
+use AiSdk\Tools\JsonQueryTool;
 use AiSdk\Tools\FinishTool;
 use AiSdk\Tools\HashTool;
 use AiSdk\Tools\HttpRequestTool;
 use AiSdk\Tools\ListDirTool;
 use AiSdk\Tools\ReadFileTool;
+use AiSdk\Tools\ReplaceInFileTool;
+use AiSdk\Tools\SearchFilesTool;
 use AiSdk\Tools\ShellTool;
 use AiSdk\Tools\TimeTool;
+use AiSdk\Tools\WriteFileTool;
 use AiSdk\Tools\UuidTool;
 
 mb_internal_encoding('UTF-8');
@@ -742,7 +747,7 @@ test('read_file: побег через .. запрещён', function (): void {
 
     $result = (new ReadFileTool(new FileSandbox($dir)))->handle(['path' => '../outside.txt']);
 
-    assertContains('выходит за пределы', $result);
+    assertContains('не должен содержать', $result);
 });
 
 test('read_file: абсолютный путь запрещён', function (): void {
@@ -778,7 +783,7 @@ test('list_dir: выход за корень запрещён', function (): voi
 
     $result = (new ListDirTool(new FileSandbox($dir)))->handle(['path' => '..']);
 
-    assertContains('выходит за пределы', $result);
+    assertContains('не должен содержать', $result);
 });
 
 // ---------------------------------------------------------------------------
@@ -1029,6 +1034,198 @@ test('http_request: allowPrivate снимает блокировку внутр�
 });
 
 // ---------------------------------------------------------------------------
+// Запись и правка файлов
+// ---------------------------------------------------------------------------
+
+test('write_file: создаёт файл', function (): void {
+    $dir = testDir();
+    $result = (new WriteFileTool(new FileSandbox($dir)))->handle([
+        'path' => 'note.txt',
+        'content' => 'привет',
+    ]);
+
+    assertContains('Создан', $result);
+    assertSame('привет', file_get_contents($dir . '/note.txt'));
+});
+
+test('write_file: перезаписывает файл', function (): void {
+    $dir = testDir();
+    file_put_contents($dir . '/note.txt', 'старое');
+
+    $result = (new WriteFileTool(new FileSandbox($dir)))->handle([
+        'path' => 'note.txt',
+        'content' => 'новое',
+    ]);
+
+    assertContains('Перезаписан', $result);
+    assertSame('новое', file_get_contents($dir . '/note.txt'));
+});
+
+test('write_file: создаёт каталоги с create_dirs', function (): void {
+    $dir = testDir();
+
+    $result = (new WriteFileTool(new FileSandbox($dir)))->handle([
+        'path' => 'a/b/c.txt',
+        'content' => 'x',
+        'create_dirs' => true,
+    ]);
+
+    assertContains('Создан', $result);
+    assertTrue(is_file($dir . '/a/b/c.txt'), 'файл не создан');
+});
+
+test('write_file: без create_dirs каталог обязателен', function (): void {
+    $dir = testDir();
+
+    $result = (new WriteFileTool(new FileSandbox($dir)))->handle([
+        'path' => 'nope/x.txt',
+        'content' => 'x',
+    ]);
+
+    assertContains('Каталог не существует', $result);
+});
+
+test('write_file: запись вне песочницы запрещена', function (): void {
+    $dir = testDir();
+
+    $result = (new WriteFileTool(new FileSandbox($dir)))->handle([
+        'path' => '../evil.txt',
+        'content' => 'x',
+    ]);
+
+    assertContains('не должен содержать', $result);
+});
+
+test('replace_in_file: заменяет единственное совпадение', function (): void {
+    $dir = testDir();
+    file_put_contents($dir . '/code.txt', "class A\nclass B\n");
+
+    $result = (new ReplaceInFileTool(new FileSandbox($dir)))->handle([
+        'path' => 'code.txt',
+        'search' => 'class A',
+        'replace' => 'final class A',
+    ]);
+
+    assertContains('Заменено вхождений: 1', $result);
+
+    $content = (string) file_get_contents($dir . '/code.txt');
+
+    assertContains('final class A', $content);
+    assertContains('class B', $content);
+});
+
+test('replace_in_file: несколько совпадений требуют all', function (): void {
+    $dir = testDir();
+    file_put_contents($dir . '/code.txt', "x\nx\n");
+
+    $result = (new ReplaceInFileTool(new FileSandbox($dir)))->handle([
+        'path' => 'code.txt',
+        'search' => 'x',
+        'replace' => 'y',
+    ]);
+
+    assertContains('Найдено совпадений: 2', $result);
+});
+
+test('replace_in_file: не найдено — понятная ошибка', function (): void {
+    $dir = testDir();
+    file_put_contents($dir . '/code.txt', 'abc');
+
+    $result = (new ReplaceInFileTool(new FileSandbox($dir)))->handle([
+        'path' => 'code.txt',
+        'search' => 'zzz',
+        'replace' => 'y',
+    ]);
+
+    assertContains('не найден', $result);
+});
+
+// ---------------------------------------------------------------------------
+// Поиск по файлам
+// ---------------------------------------------------------------------------
+
+test('search_files: находит строки с номерами', function (): void {
+    $dir = testDir();
+    file_put_contents($dir . '/a.php', "<?php\nclass Foo {}\n");
+    file_put_contents($dir . '/b.txt', "class Bar\n");
+
+    $result = (new SearchFilesTool(new FileSandbox($dir)))->handle(['pattern' => 'class \w+']);
+
+    assertContains('a.php:2:', $result);
+    assertContains('b.txt:1:', $result);
+});
+
+test('search_files: glob ограничивает файлы', function (): void {
+    $dir = testDir();
+    file_put_contents($dir . '/a.php', "class Foo\n");
+    file_put_contents($dir . '/b.txt', "class Bar\n");
+
+    $result = (new SearchFilesTool(new FileSandbox($dir)))->handle([
+        'pattern' => 'class',
+        'glob' => '*.php',
+    ]);
+
+    assertContains('a.php', $result);
+    assertTrue(!str_contains($result, 'b.txt'), 'лишний файл в выдаче');
+});
+
+test('search_files: служебные каталоги пропускаются', function (): void {
+    $dir = testDir();
+    mkdir($dir . '/vendor', 0777, true);
+    file_put_contents($dir . '/vendor/lib.php', "class Vendor\n");
+    file_put_contents($dir . '/app.php', "class App\n");
+
+    $result = (new SearchFilesTool(new FileSandbox($dir)))->handle(['pattern' => 'class']);
+
+    assertContains('app.php', $result);
+    assertTrue(!str_contains($result, 'vendor'), 'vendor не должен сканироваться');
+});
+
+test('search_files: некорректная регулярка', function (): void {
+    $dir = testDir();
+
+    $result = (new SearchFilesTool(new FileSandbox($dir)))->handle(['pattern' => '([']);
+
+    assertContains('Некорректное регулярное выражение', $result);
+});
+
+test('find_files: поиск по маске', function (): void {
+    $dir = testDir();
+    file_put_contents($dir . '/a.php', 'x');
+    file_put_contents($dir . '/b.txt', 'x');
+
+    $result = (new FindFilesTool(new FileSandbox($dir)))->handle(['pattern' => '*.php']);
+
+    assertContains('a.php', $result);
+    assertTrue(!str_contains($result, 'b.txt'), 'лишний файл в выдаче');
+});
+
+// ---------------------------------------------------------------------------
+// JSON
+// ---------------------------------------------------------------------------
+
+test('json_query: вложенный путь', function (): void {
+    $result = (new JsonQueryTool())->handle([
+        'json' => '{"data":{"items":[{"id":42,"name":"x"}]}}',
+        'path' => 'data.items[0].id',
+    ]);
+
+    assertContains('42', $result);
+});
+
+test('json_query: нет ключа — сообщение', function (): void {
+    $result = (new JsonQueryTool())->handle(['json' => '{"a":1}', 'path' => 'b']);
+
+    assertContains('не найден', $result);
+});
+
+test('json_query: битый JSON', function (): void {
+    $result = (new JsonQueryTool())->handle(['json' => '{oops', 'path' => 'a']);
+
+    assertContains('Некорректный JSON', $result);
+});
+
+// ---------------------------------------------------------------------------
 // run_command: оболочка
 // ---------------------------------------------------------------------------
 
@@ -1083,4 +1280,6 @@ removeDir(__DIR__ . '/tmp');
 echo PHP_EOL . 'пройдено: ' . $passed . ', провалено: ' . $failed . PHP_EOL;
 
 exit($failed === 0 ? 0 : 1);
+
+
 

@@ -21,9 +21,9 @@ echo $agent->ask('Который час в Москве и сколько буд
 - **`Tool` + `ToolRegistry`** — инструмент = 4 метода; реестр сам отдаёт
   схемы модели и вызывает нужный инструмент.
 - **`ChatClient`** — интерфейс, чтобы подменить модель заглушкой в тестах.
-- **13 готовых инструментов**: время, калькулятор, погода, файлы, CSV, HTTP,
-  единицы, даты, UUID, хеши, явное завершение и команды оболочки —
-  см. [таблицу](#инструменты).
+- **18 готовых инструментов**: время, калькулятор, погода, файлы (чтение,
+  запись, поиск), CSV, HTTP, единицы, даты, UUID, хеши, JSON, явное завершение
+  и команды оболочки — см. [таблицу](#инструменты).
 
 Без Composer, без фреймворка, без БД. Только PHP и расширение `curl`.
 
@@ -70,8 +70,13 @@ tools/
   FinishTool.php       явное завершение работы с результатом
   FileSandbox.php      ограничитель путей (общий для файловых инструментов)
   ReadFileTool.php     чтение файла внутри корня
+  WriteFileTool.php    запись файла (атомарно)
+  ReplaceInFileTool.php точечная замена фрагмента
+  SearchFilesTool.php  поиск по содержимому
+  FindFilesTool.php    поиск файлов по маске
   ListDirTool.php      список каталога внутри корня
   CsvQueryTool.php     выборка из CSV с фильтром
+  JsonQueryTool.php    значение по пути из JSON
   HttpRequestTool.php  HTTP любого метода с авторизацией
   ShellTool.php        команды оболочки (опасно)
   ConvertUnitsTool.php температура, длина, масса, скорость
@@ -164,8 +169,13 @@ $agent = Agent::fromEnv($tools, 'Отвечай кратко.');
 | `calculator` | арифметика без `eval()` | — |
 | `get_weather` | погода (open-meteo, без ключа) | — |
 | `read_file` | чтение файла внутри корня | `new ReadFileTool($sandbox)` |
+| `write_file` | создать/перезаписать файл | `new WriteFileTool($sandbox)` |
+| `replace_in_file` | точечная замена фрагмента | `new ReplaceInFileTool($sandbox)` |
+| `search_files` | поиск по содержимому (grep) | `new SearchFilesTool($sandbox)` |
+| `find_files` | поиск файлов по маске | `new FindFilesTool($sandbox)` |
 | `list_dir` | содержимое каталога | `new ListDirTool($sandbox)` |
 | `csv_query` | выборка из CSV с фильтром | `new CsvQueryTool($sandbox)` |
+| `json_query` | значение по пути из JSON | — |
 | `http_request` | любой метод, тело, Basic/Bearer | — |
 | `convert_units` | температура, длина, масса, скорость | — |
 | `date_calc` | разница дат, «+30 days» | — |
@@ -181,14 +191,37 @@ $sandbox = new FileSandbox(__DIR__ . '/data');
 
 $tools = (new ToolRegistry())->add(
     new ReadFileTool($sandbox),
+    new WriteFileTool($sandbox),
+    new ReplaceInFileTool($sandbox),
+    new SearchFilesTool($sandbox),
+    new FindFilesTool($sandbox),
     new ListDirTool($sandbox),
     new CsvQueryTool($sandbox),
 );
 ```
 
 - всё вне корня отвергается: `..`, абсолютные пути, симлинки наружу;
-- бинарные файлы не читаются, сообщается размер;
-- большие файлы — через `offset` и `limit` в строках.
+- запись атомарная: временный файл рядом и `rename`, полузаписанных файлов нет;
+- `replace_in_file` требует **ровно одного** совпадения `search` — чтобы модель
+  не заменила не тот кусок; для осознанной массовой замены есть `all: true`;
+- поиск пропускает `.git`, `vendor`, `node_modules`, `var` и не читает бинарные
+  файлы и файлы больше 1 МБ;
+- большие файлы читаются через `offset` и `limit` в строках.
+
+Запись — единственная деструктивная операция среди файловых инструментов.
+Перед регистрацией `write_file`/`replace_in_file` стоит подумать о
+`toolApproval`: хук может спросить человека или запретить запись вне нужных
+каталогов.
+
+`json_query` достаёт значение по простому пути — удобно после `http_request`,
+когда ответ большой:
+
+```php
+(new JsonQueryTool())->handle([
+    'json' => '{"data":{"items":[{"id":42}]}}',
+    'path' => 'data.items[0].id',
+]); // data.items[0].id = 42
+```
 
 `http_request` — любой метод с параметрами и авторизацией:
 
@@ -417,11 +450,11 @@ curl http://10.10.10.77:8080/v1/models
 php tests/run.php
 ```
 
-72 проверки: калькулятор, время, реестр, обрезка результатов, весь цикл агента,
-настройки (tool_choice, подтверждение вызовов, история), finish, файловая
-песочница, CSV, единицы, даты, uuid/хеши, сборка HTTP-запроса (методы, тело,
-заголовки, Basic/Bearer), защита от SSRF и run_command (код выхода, таймаут,
-allowlist, обрезка)
+88 проверок: калькулятор, время, реестр, обрезка результатов, весь цикл агента,
+настройки (tool_choice, подтверждение вызовов, история), finish, файлы
+(чтение, запись, замена, поиск, побег из песочницы), CSV, единицы, даты,
+uuid/хеши, сборка HTTP-запроса (методы, тело, заголовки, Basic/Bearer),
+защита от SSRF, run_command (код выхода, таймаут, allowlist, обрезка)
 (успех, ошибка инструмента, лимит раундов, история). Сеть не нужна — модель
 подменяется `FakeClient` из `tests/run.php`.
 
