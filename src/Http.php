@@ -7,9 +7,9 @@ namespace AiSdk;
 /**
  * Минимальный HTTP-клиент без зависимостей.
  *
- * get() — простой GET с редиректами (используется инструментами вроде погоды).
- * request() — низкоуровневый вариант: без авто-редиректов, с лимитом размера
- * и заголовком Location. На нём строится http_get с защитой от SSRF.
+ * get() — простой GET с редиректами (инструменты вроде погоды).
+ * request() — низкоуровневый вызов: метод, заголовки, тело, лимит размера.
+ * На нём построен http_request, включая защиту от SSRF.
  */
 final class Http
 {
@@ -24,15 +24,43 @@ final class Http
     }
 
     /**
+     * Привести заголовки к формату cURL: список строк "Имя: значение".
+     *
+     * Принимает и карту ['X-Trace' => 'abc'], и уже готовый список строк.
+     * Пустой список заменяется на Accept по умолчанию.
+     *
+     * @param array<int|string, string> $headers
+     * @return list<string>
+     */
+    public static function headerLines(array $headers): array
+    {
+        if ($headers === []) {
+            return ['Accept: */*'];
+        }
+
+        $lines = [];
+
+        foreach ($headers as $name => $value) {
+            $lines[] = is_int($name) ? (string) $value : $name . ': ' . $value;
+        }
+
+        return $lines;
+    }
+
+    /**
      * @param bool $follow   следовать редиректам автоматически
      * @param int $maxBytes  предел тела ответа; больше — обрезаем и обрываем загрузку
-     * @return array{status: int, body: string, location: string|null, truncated: bool}
+     * @param array<string, string> $headers
+     * @return array{status: int, body: string, location: string|null, content_type: string|null, truncated: bool}
      */
     public static function request(
         string $url,
         float $timeout = 10.0,
         bool $follow = false,
         int $maxBytes = 262144,
+        string $method = 'GET',
+        array $headers = [],
+        ?string $body = null,
     ): array {
         $ch = curl_init($url);
 
@@ -40,15 +68,18 @@ final class Http
             throw new AiException('не удалось создать cURL-дескриптор');
         }
 
-        $body = '';
+        $body = $body ?? '';
+        $response = '';
         $truncated = false;
         $location = null;
+        $contentType = null;
         $limit = max(1024, $maxBytes);
 
         $verify = Env::bool('AI_VERIFY_SSL', true);
 
         $options = [
             CURLOPT_RETURNTRANSFER => false,
+            CURLOPT_CUSTOMREQUEST => strtoupper($method),
             CURLOPT_TIMEOUT_MS => (int) round($timeout * 1000),
             CURLOPT_CONNECTTIMEOUT_MS => 5000,
             CURLOPT_FOLLOWLOCATION => $follow,
@@ -56,29 +87,41 @@ final class Http
             CURLOPT_SSL_VERIFYPEER => $verify,
             CURLOPT_SSL_VERIFYHOST => $verify ? 2 : 0,
             CURLOPT_USERAGENT => 'ai-sdk/1.0 (+https://example.local)',
-            CURLOPT_HTTPHEADER => ['Accept: */*'],
-            CURLOPT_WRITEFUNCTION => static function ($handle, string $chunk) use (&$body, &$truncated, $limit): int {
-                $room = $limit - strlen($body);
+            CURLOPT_HTTPHEADER => self::headerLines($headers),
+            CURLOPT_WRITEFUNCTION => static function ($handle, string $chunk) use (&$response, &$truncated, $limit): int {
+                $room = $limit - strlen($response);
 
                 if (strlen($chunk) > $room) {
-                    $body .= substr($chunk, 0, $room);
+                    $response .= substr($chunk, 0, $room);
                     $truncated = true;
 
                     return 0; // прерываем загрузку
                 }
 
-                $body .= $chunk;
+                $response .= $chunk;
 
                 return strlen($chunk);
             },
-            CURLOPT_HEADERFUNCTION => static function ($handle, string $line) use (&$location): int {
-                if (stripos($line, 'location:') === 0) {
+            CURLOPT_HEADERFUNCTION => static function ($handle, string $line) use (&$location, &$contentType): int {
+                $lower = strtolower($line);
+
+                if (str_starts_with($lower, 'location:')) {
                     $location = trim(substr($line, 9));
+                } elseif (str_starts_with($lower, 'content-type:')) {
+                    $contentType = trim(substr($line, 13));
                 }
 
                 return strlen($line);
             },
         ];
+
+        if ($body !== '') {
+            $options[CURLOPT_POSTFIELDS] = $body;
+        }
+
+        if (strtoupper($method) === 'HEAD') {
+            $options[CURLOPT_NOBODY] = true;
+        }
 
         $caInfo = Env::get('AI_CAINFO', '') ?? '';
 
@@ -101,8 +144,9 @@ final class Http
 
         return [
             'status' => $status,
-            'body' => $body,
+            'body' => $response,
             'location' => $location,
+            'content_type' => $contentType,
             'truncated' => $truncated,
         ];
     }
