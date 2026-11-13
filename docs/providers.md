@@ -21,7 +21,7 @@ mistral-nemo и т.п.).
 
 | Ошибка | Причина | Решение |
 |---|---|---|
-| `SSL certificate problem: unable to get local issuer certificate` | у PHP нет CA-бандла (обычно Windows) | `AI_CAINFO=C:\path\cacert.pem`; быстрый обход — `AI_VERIFY_SSL=false` |
+| `SSL certificate problem: unable to get local issuer certificate` | у PHP нет CA-бандла (обычно Windows) | возникает только при `AI_VERIFY_SSL=true`: укажите `AI_CAINFO=C:\path\cacert.pem` |
 | `Ошибка сети: Connection refused` | сервер не запущен или другой порт | проверить `AI_BASE_URL` (`curl http://host:8080/v1/models`) |
 | `HTTP 401` | пустой или неверный ключ | `AI_API_KEY` |
 | `HTTP 404` / `model not found` | модель не загружена | `AI_MODEL` = имя из `/v1/models` |

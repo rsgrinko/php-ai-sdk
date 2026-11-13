@@ -15,8 +15,9 @@ final class AiClient implements ChatClient
     /**
      * @param array<string, mixed> $extraBody дополнительные поля тела запроса,
      *                                        если провайдер их требует
-     * @param bool   $verifySsl проверять TLS-сертификат (по умолчанию да).
-     *                          false — только для локальной отладки.
+     * @param bool   $verifySsl проверять TLS-сертификат. По умолчанию выключено,
+     *                          чтобы работало «из коробки» (в том числе на Windows
+     *                          без CA-бандла). В проде включайте: true или AI_VERIFY_SSL=true.
      * @param string $caInfo    путь к своему CA-бандлу (cacert.pem). Пусто —
      *                          системные сертификаты PHP/OpenSSL.
      * @param Retry  $retry     повторы при 429/5xx и обрыве связи;
@@ -30,39 +31,72 @@ final class AiClient implements ChatClient
         private readonly float $temperature = 0.7,
         private readonly int $maxTokens = 1000,
         private readonly array $extraBody = [],
-        private readonly bool $verifySsl = true,
+        private readonly bool $verifySsl = false,
         private readonly string $caInfo = '',
         private readonly Retry $retry = new Retry(),
     ) {
     }
 
     /**
-     * Собрать клиент из .env. Все параметры необязательны, кроме ключа
-     * для закрытых провайдеров.
+     * Собрать клиент из переменных окружения AI_* (и .env, если он загружен).
      *
      * @param float|null $timeout переопределить AI_TIMEOUT: на локальных моделях
      *                            большой набор инструментов замедляет ответ.
      */
     public static function fromEnv(?float $timeout = null): self
     {
+        return self::fromConfig(Config::fromEnv(), $timeout);
+    }
+
+    /**
+     * Собрать клиент из массива — когда .env нет, а настройки лежат
+     * в константах, конфиге фреймворка или базе. Ключи — см. Config::ENV.
+     *
+     *   AiClient::fromArray(['api_key' => 'sk-...', 'model' => 'deepseek-chat']);
+     *
+     * @param array<string, mixed> $config
+     * @throws \InvalidArgumentException если есть неизвестный ключ
+     */
+    public static function fromArray(array $config): self
+    {
+        return self::fromConfig(Config::fromArray($config));
+    }
+
+    /**
+     * Собрать клиент, откуда бы ни пришли настройки: значение из массива,
+     * недостающее — из окружения (.env), остальное — по умолчанию.
+     *
+     *   AiClient::create();                          // как fromEnv()
+     *   AiClient::create(['model' => 'gpt-4o-mini']); // модель своя, ключ из AI_API_KEY
+     *
+     * @param array<string, mixed> $config
+     * @throws \InvalidArgumentException если есть неизвестный ключ
+     */
+    public static function create(array $config = []): self
+    {
+        return self::fromConfig(Config::resolve($config));
+    }
+
+    private static function fromConfig(Config $config, ?float $timeout = null): self
+    {
         $extraBody = [];
 
         // DeepSeek умеет отключать «размышления» — так ответ быстрее и дешевле.
-        if (Env::bool('AI_DISABLE_THINKING', false)) {
+        if ($config->bool('disable_thinking', false)) {
             $extraBody['thinking'] = ['type' => 'disabled'];
         }
 
         return new self(
-            apiKey: Env::get('AI_API_KEY', '') ?? '',
-            model: Env::get('AI_MODEL', 'deepseek-chat') ?? 'deepseek-chat',
-            baseUrl: Env::get('AI_BASE_URL', 'https://api.deepseek.com') ?? 'https://api.deepseek.com',
-            timeout: $timeout ?? Env::float('AI_TIMEOUT', 30.0),
-            temperature: Env::float('AI_TEMPERATURE', 0.7),
-            maxTokens: Env::int('AI_MAX_TOKENS', 1000),
+            apiKey: $config->string('api_key', ''),
+            model: $config->string('model', 'deepseek-chat'),
+            baseUrl: $config->string('base_url', 'https://api.deepseek.com'),
+            timeout: $timeout ?? $config->float('timeout', 30.0),
+            temperature: $config->float('temperature', 0.7),
+            maxTokens: $config->int('max_tokens', 1000),
             extraBody: $extraBody,
-            verifySsl: Env::bool('AI_VERIFY_SSL', true),
-            caInfo: Env::get('AI_CAINFO', '') ?? '',
-            retry: new Retry(maxRetries: max(0, Env::int('AI_MAX_RETRIES', 2))),
+            verifySsl: $config->bool('verify_ssl', false),
+            caInfo: $config->string('ca_info', ''),
+            retry: new Retry(maxRetries: max(0, $config->int('max_retries', 2))),
         );
     }
 
@@ -102,6 +136,8 @@ final class AiClient implements ChatClient
             method: 'POST',
             headers: $this->requestHeaders(),
             body: $payload,
+            verifySsl: $this->verifySsl,
+            caInfo: $this->caInfo,
         ));
 
         $status = $response['status'];

@@ -74,22 +74,69 @@ final class Agent
     }
 
     /**
-     * Агент из настроек .env (AI_*), с переданными инструментами.
+     * Агент из переменных окружения AI_* (и .env, если он загружен).
      */
     public static function fromEnv(
         ToolRegistry $tools = new ToolRegistry(),
         string $systemPrompt = self::DEFAULT_SYSTEM_PROMPT,
         ?AgentHooks $hooks = null,
     ): self {
+        return self::fromConfig(Config::fromEnv(), AiClient::fromEnv(), $tools, $systemPrompt, $hooks);
+    }
+
+    /**
+     * Агент из массива — когда .env нет. В одном массиве и настройки
+     * клиента (api_key, model, ...), и агента (max_rounds, ...): см. Config::ENV.
+     *
+     *   Agent::fromArray(['api_key' => 'sk-...', 'max_rounds' => 8], $tools);
+     *
+     * @param array<string, mixed> $config
+     * @throws \InvalidArgumentException если есть неизвестный ключ
+     */
+    public static function fromArray(
+        array $config,
+        ToolRegistry $tools = new ToolRegistry(),
+        string $systemPrompt = self::DEFAULT_SYSTEM_PROMPT,
+        ?AgentHooks $hooks = null,
+    ): self {
+        return self::fromConfig(Config::fromArray($config), AiClient::fromArray($config), $tools, $systemPrompt, $hooks);
+    }
+
+    /**
+     * Агент, откуда бы ни пришли настройки: значение из массива,
+     * недостающее — из окружения (.env), остальное — по умолчанию.
+     *
+     *   Agent::create([], $tools);                    // как fromEnv()
+     *   Agent::create(['max_rounds' => 8], $tools);   // остальное из AI_*
+     *
+     * @param array<string, mixed> $config
+     * @throws \InvalidArgumentException если есть неизвестный ключ
+     */
+    public static function create(
+        array $config = [],
+        ToolRegistry $tools = new ToolRegistry(),
+        string $systemPrompt = self::DEFAULT_SYSTEM_PROMPT,
+        ?AgentHooks $hooks = null,
+    ): self {
+        return self::fromConfig(Config::resolve($config), AiClient::create($config), $tools, $systemPrompt, $hooks);
+    }
+
+    private static function fromConfig(
+        Config $config,
+        ChatClient $client,
+        ToolRegistry $tools,
+        string $systemPrompt,
+        ?AgentHooks $hooks,
+    ): self {
         return new self(
-            client: AiClient::fromEnv(),
+            client: $client,
             tools: $tools,
             systemPrompt: $systemPrompt,
-            maxRounds: Env::int('AI_MAX_ROUNDS', 5),
-            toolChoice: Env::get('AI_TOOL_CHOICE', 'auto') ?? 'auto',
-            parallelToolCalls: Env::bool('AI_PARALLEL_TOOL_CALLS', true),
-            historyLimit: Env::int('AI_HISTORY_LIMIT', 40),
-            finishTool: Env::get('AI_FINISH_TOOL', 'finish') ?? 'finish',
+            maxRounds: $config->int('max_rounds', 5),
+            toolChoice: $config->string('tool_choice', 'auto'),
+            parallelToolCalls: $config->bool('parallel_tool_calls', true),
+            historyLimit: $config->int('history_limit', 40),
+            finishTool: $config->string('finish_tool', 'finish'),
             hooks: $hooks,
         );
     }

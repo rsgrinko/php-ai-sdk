@@ -37,7 +37,7 @@ final class HttpTransport
         }
 
         return ' Подсказка: укажите путь к корневым сертификатам в AI_CAINFO '
-            . 'или временно поставьте AI_VERIFY_SSL=false (только локально).';
+            . 'или отключите проверку: AI_VERIFY_SSL=false (небезопасно).';
     }
 
     /**
@@ -70,6 +70,8 @@ final class HttpTransport
      * @param array<string, string> $headers
      * @param list<string> $resolve строки CURLOPT_RESOLVE ("host:port:ip"): подключаться
      *                     к заранее проверенным адресам без повторного DNS (см. UrlGuard::pin)
+     * @param bool|null $verifySsl проверять TLS-сертификат; null — из AI_VERIFY_SSL (по умолчанию нет)
+     * @param string|null $caInfo путь к CA-бандлу; null — из AI_CAINFO, '' — системный
      * @return array{status: int, body: string, location: string|null, content_type: string|null, retry_after: string|null, truncated: bool}
      */
     public static function request(
@@ -81,6 +83,8 @@ final class HttpTransport
         array $headers = [],
         ?string $body = null,
         array $resolve = [],
+        ?bool $verifySsl = null,
+        ?string $caInfo = null,
     ): array {
         $ch = curl_init($url);
 
@@ -96,7 +100,10 @@ final class HttpTransport
         $retryAfter = null;
         $limit = max(1024, $maxBytes);
 
-        $verify = Env::bool('AI_VERIFY_SSL', true);
+        // Явные параметры важнее окружения: при подключении через Composer
+        // .env может и не быть, а настройки передаются в конструктор клиента.
+        $verify = $verifySsl ?? Env::bool('AI_VERIFY_SSL', false);
+        $caInfo ??= Env::get('AI_CAINFO', '') ?? '';
 
         $options = [
             CURLOPT_RETURNTRANSFER => false,
@@ -107,7 +114,7 @@ final class HttpTransport
             CURLOPT_MAXREDIRS => 3,
             CURLOPT_SSL_VERIFYPEER => $verify,
             CURLOPT_SSL_VERIFYHOST => $verify ? 2 : 0,
-            CURLOPT_USERAGENT => 'ai-sdk/1.0 (+https://example.local)',
+            CURLOPT_USERAGENT => 'rsgrinko-ai-sdk/0.1 (+https://github.com/rsgrinko/php-ai-sdk)',
             CURLOPT_HTTPHEADER => self::headerLines($headers),
             CURLOPT_WRITEFUNCTION => static function ($handle, string $chunk) use (&$response, &$truncated, $limit): int {
                 $room = $limit - strlen($response);
@@ -149,8 +156,6 @@ final class HttpTransport
         if ($resolve !== []) {
             $options[CURLOPT_RESOLVE] = $resolve;
         }
-
-        $caInfo = Env::get('AI_CAINFO', '') ?? '';
 
         if ($caInfo !== '') {
             $options[CURLOPT_CAINFO] = $caInfo;

@@ -5,3 +5,12 @@
 *.png binary
 *.jpg binary
 *.ico binary
+
+# Что не попадает в пакет Composer (composer require ставит только нужное).
+/.gitattributes   export-ignore
+/.gitignore       export-ignore
+/.env.example     export-ignore
+/.idea            export-ignore
+/docs             export-ignore
+/examples         export-ignore
+/tests            export-ignore

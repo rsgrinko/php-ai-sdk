@@ -45,6 +45,51 @@ $agent = new Agent(new LoggingClient(AiClient::fromEnv()), $tools);
 - **Не отдавайте в `ToolRegistry` больше прав, чем нужно** конкретному сценарию.
 - `calculator` считает сам, без `eval()` — не заменяйте на `eval`.
 
+## Настройки: откуда берутся
+
+`.env` не обязателен. Клиент и агент собираются четырьмя способами:
+
+```php
+// 1. Только окружение: переменные AI_* (и .env, если загружен через bootstrap.php или Env::load).
+$client = AiClient::fromEnv();
+$agent = Agent::fromEnv($tools);
+
+// 2. Только массив — окружение не читается. Для констант, конфига фреймворка, БД.
+$config = ['api_key' => MY_AI_KEY, 'model' => 'deepseek-chat', 'max_rounds' => 8];
+$client = AiClient::fromArray($config);
+$agent = Agent::fromArray($config, $tools);   // один массив и для клиента, и для агента
+
+// 3. Смешанно: значение из массива, недостающее — из окружения, остальное — по умолчанию.
+$agent = Agent::create(['model' => 'gpt-4o-mini'], $tools);   // ключ возьмётся из AI_API_KEY
+
+// 4. Явно, конструктором — без всяких источников.
+$client = new AiClient(apiKey: 'sk-...', model: 'deepseek-chat', verifySsl: true);
+```
+
+Неизвестный ключ в массиве — `InvalidArgumentException` со списком доступных:
+опечатка (`modle`) не превращается молча в значение по умолчанию. Значения
+можно передавать и строками (`'true'`, `'30'`), и нужного типа.
+
+| Ключ массива | Переменная | По умолчанию | Что задаёт |
+|---|---|---|---|
+| `api_key` | `AI_API_KEY` | `''` | ключ API |
+| `model` | `AI_MODEL` | `deepseek-chat` | модель |
+| `base_url` | `AI_BASE_URL` | `https://api.deepseek.com` | адрес API без `/chat/completions` |
+| `timeout` | `AI_TIMEOUT` | `30` | таймаут запроса, с |
+| `temperature` | `AI_TEMPERATURE` | `0.7` | температура |
+| `max_tokens` | `AI_MAX_TOKENS` | `1000` | лимит ответа |
+| `disable_thinking` | `AI_DISABLE_THINKING` | `false` | DeepSeek: без «размышлений» |
+| `verify_ssl` | `AI_VERIFY_SSL` | `false` | проверка TLS-сертификата |
+| `ca_info` | `AI_CAINFO` | `''` | путь к CA-бандлу |
+| `max_retries` | `AI_MAX_RETRIES` | `2` | повторы при 429/5xx |
+| `max_rounds` | `AI_MAX_ROUNDS` | `5` | раундов инструментов за ход |
+| `tool_choice` | `AI_TOOL_CHOICE` | `auto` | auto, none, required или имя инструмента |
+| `parallel_tool_calls` | `AI_PARALLEL_TOOL_CALLS` | `true` | несколько вызовов за ответ |
+| `history_limit` | `AI_HISTORY_LIMIT` | `40` | сообщений истории (0 — без лимита) |
+| `finish_tool` | `AI_FINISH_TOOL` | `finish` | имя инструмента-финиша |
+
+`http_request` тоже не зависит от окружения, если передать настройки явно:
+`new HttpRequestTool(verifySsl: true, caInfo: '/path/cacert.pem')`.
 
 ## Шпаргалка по API
 

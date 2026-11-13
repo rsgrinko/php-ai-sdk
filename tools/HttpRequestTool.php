@@ -35,6 +35,8 @@ final class HttpRequestTool implements Tool
      * @param array<string, array<string, string>> $auth креды по хосту:
      *        ['api.example.com' => ['user' => 'bot', 'pass' => '***']]
      *        или ['api.example.com' => ['type' => 'bearer', 'token' => '***']]
+     * @param bool|null $verifySsl проверять TLS-сертификат; null — из AI_VERIFY_SSL (по умолчанию нет)
+     * @param string|null $caInfo путь к CA-бандлу; null — из AI_CAINFO
      */
     public function __construct(
         array $auth = [],
@@ -42,6 +44,8 @@ final class HttpRequestTool implements Tool
         private readonly int $defaultChars = 4000,
         private readonly float $timeout = 10.0,
         private readonly float $maxTimeout = 60.0,
+        private readonly ?bool $verifySsl = null,
+        private readonly ?string $caInfo = null,
     ) {
         $normalized = [];
 
@@ -166,6 +170,8 @@ final class HttpRequestTool implements Tool
                     $request->headers,
                     $request->body,
                     $pinned,
+                    $this->verifySsl,
+                    $this->caInfo,
                 );
 
                 $isRedirect = in_array($response['status'], [301, 302, 303, 307, 308], true);

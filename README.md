@@ -1,3 +1,60 @@
+# rsgrinko/ai-sdk
+
+Лёгкая PHP-библиотека для агентов с вызовом инструментов поверх любого
+OpenAI-совместимого API: DeepSeek, OpenAI, OpenRouter, Ollama, llama.cpp,
+LM Studio. Без зависимостей — только PHP и `curl`.
+
+```php
+use Rsgrinko\AiSdk\Agent;
+use Rsgrinko\AiSdk\AiClient;
+use Rsgrinko\AiSdk\ToolRegistry;
+use Rsgrinko\AiSdk\Tools\CalculatorTool;
+use Rsgrinko\AiSdk\Tools\TimeTool;
+
+$client = new AiClient(apiKey: 'sk-...', model: 'deepseek-chat');
+$agent = new Agent($client, (new ToolRegistry())->add(new TimeTool(), new CalculatorTool()));
+
+echo $agent->ask('Который час в Москве и сколько будет 17% от 4300?');
+```
+
+## Установка
+
+Через Composer:
+
+```bash
+composer require rsgrinko/ai-sdk
+```
+
+Без Composer — скачать репозиторий и подключить одну строку:
+
+```php
+require '/path/to/ai-sdk/bootstrap.php';   // автозагрузка + чтение .env рядом
+```
+
+## Настройки — с `.env` или без
+
+`.env` не обязателен: настройки можно брать откуда угодно.
+
+```php
+AiClient::fromEnv();                       // переменные окружения AI_* (и .env)
+AiClient::fromArray(['api_key' => KEY]);   // только массив: константы, конфиг, БД
+AiClient::create(['model' => 'gpt-4o']);   // массив, недостающее — из окружения
+new AiClient(apiKey: KEY, model: '...');   // явно, конструктором
+```
+
+То же для агента: `Agent::fromEnv($tools)`, `Agent::fromArray($config, $tools)`,
+`Agent::create($config, $tools)`. Один массив подходит и клиенту, и агенту.
+Все ключи и переменные — в [справочнике](docs/reference.md#настройки-откуда-берутся).
+
+При установке через Composer `.env` сам не читается. Нужен — загрузите его
+явно: `Rsgrinko\AiSdk\Env::load(__DIR__ . '/.env')`. При подключении через
+`bootstrap.php` он читается автоматически.
+
+> **TLS.** Проверка сертификата по умолчанию выключена, чтобы всё работало
+> «из коробки» (в том числе на Windows без CA-бандла). В проде включайте её:
+> `new AiClient(..., verifySsl: true)` или `AI_VERIFY_SSL=true`. Без проверки
+> перехвативший трафик увидит ключ API и переписку с моделью.
+
 ## Что внутри
 
 - **`AiClient`** — один HTTP-вызов `/chat/completions` для DeepSeek, OpenAI,
@@ -11,16 +68,16 @@
 - **`Cost`** — оценка стоимости по токенам и тарифу провайдера.
 - **`Retry`** — повтор запроса к модели при 429/5xx и обрыве связи,
   с учётом `Retry-After`.
-- **18 готовых инструментов**: время, калькулятор, погода, файлы (чтение,
-  запись, поиск), CSV, HTTP, единицы, даты, UUID, хеши, JSON, явное завершение
-  и команды оболочки — см. [таблицу](docs/tools.md).
+- **19 готовых инструментов**: время, калькулятор, погода, файлы (чтение,
+  запись, поиск), CSV, SQL (MySQL/MariaDB), HTTP, единицы, даты, UUID, хеши,
+  JSON, явное завершение и команды оболочки — см. [таблицу](docs/tools.md).
 
-Без Composer, без фреймворка, без БД. Только PHP и расширение `curl`.
+Без зависимостей и без фреймворка; Composer — по желанию.
 
 ## Требования
 
 - PHP **8.1+** (проверено на 8.3)
-- расширение `curl`
+- расширения `curl`, `json`, `mbstring`; `pdo` — только для `sql_query`
 - ключ API (или локальная модель)
 
 ## Быстрый старт
@@ -54,6 +111,7 @@ src/
   Tool.php             интерфейс инструмента
   ToolRegistry.php     набор инструментов
   HttpTransport.php    низкоуровневый HTTP: методы, тело, лимит размера
+  Config.php           настройки из массива (fromArray, create) — без .env
   Env.php              .env без зависимостей
   AiException.php      ошибки
 tools/
@@ -307,9 +365,11 @@ $agent = new Agent($fakeClient, $tools);   // ChatClient из tests/support.php
 $agent->ask('вопрос');
 ```
 
----
+## Лицензия
 
-Лицензия: делайте что хотите.
+[MIT](LICENSE) © rsgrinko. Библиотеку можно свободно использовать, менять
+и распространять, в том числе в закрытых проектах, при условии, что в копиях
+сохраняются уведомление об авторском праве и текст лицензии.
 
 
 
