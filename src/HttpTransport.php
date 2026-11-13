@@ -167,7 +167,8 @@ final class HttpTransport
         $status = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
         $errno = curl_errno($ch);
         $error = curl_error($ch);
-        curl_close($ch);
+        // curl_close() не нужен: с PHP 8.0 дескриптор — объект и закрывается
+        // сам, а в PHP 8.5 вызов объявлен устаревшим.
 
         // 23 = CURLE_WRITE_ERROR: это мы сами оборвали слишком большой ответ.
         if ($errno !== 0 && !($truncated && $errno === 23)) {

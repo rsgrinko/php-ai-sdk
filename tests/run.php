@@ -20,6 +20,7 @@ foreach ($cases as $case) {
 
 removeDir(__DIR__ . '/tmp');
 
-echo PHP_EOL . 'пройдено: ' . $passed . ', провалено: ' . $failed . PHP_EOL;
+echo PHP_EOL . 'пройдено: ' . $passed . ', провалено: ' . $failed
+    . ($skipped > 0 ? ', пропущено: ' . $skipped : '') . PHP_EOL;
 
 exit($failed === 0 ? 0 : 1);

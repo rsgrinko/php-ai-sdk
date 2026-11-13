@@ -119,7 +119,9 @@ final class CsvQueryTool implements Tool
 
         $rows = [];
 
-        while (($row = fgetcsv($handle, 0, $delimiter)) !== false) {
+        // enclosure и escape — явно: в PHP 8.4+ без escape предупреждение
+        // (значение по умолчанию поменяется). Поведение прежнее.
+        while (($row = fgetcsv($handle, 0, $delimiter, '"', '\\')) !== false) {
             $rows[] = array_map(static fn ($cell): string => trim((string) $cell), $row);
         }
 

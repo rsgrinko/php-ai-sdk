@@ -23,6 +23,18 @@ mb_internal_encoding('UTF-8');
 
 $passed = 0;
 $failed = 0;
+$skipped = 0;
+
+/**
+ * Пропустить тест, которому не хватает окружения (драйвера, расширения).
+ */
+function skip(string $name, string $reason): void
+{
+    global $skipped;
+
+    $skipped++;
+    echo 'skip ' . $name . ' — ' . $reason . PHP_EOL;
+}
 
 function test(string $name, callable $fn): void
 {

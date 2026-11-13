@@ -7,6 +7,19 @@ declare(strict_types=1);
 use Rsgrinko\AiSdk\Tools\DatabaseTool;
 use Rsgrinko\AiSdk\Tools\Support\TextTable;
 
+test('TextTable: кириллица выравнивается по символам', function (): void {
+    $table = TextTable::render([['город', 'n'], ['Тула', '1'], ['Москва', '22']]);
+
+    assertSame("город  | n\n-------+---\nТула   | 1\nМосква | 22", $table);
+});
+
+// Дальше нужен SQLite: без драйвера тесты пропускаются, а не падают.
+if (!in_array('sqlite', PDO::getAvailableDrivers(), true)) {
+    skip('sql_query: 11 тестов', 'нет драйвера pdo_sqlite');
+
+    return;
+}
+
 function demoDb(): PDO
 {
     $pdo = new PDO('sqlite::memory:');
@@ -128,10 +141,4 @@ test('sql_query: описание зависит от режима и имени
     assertContains('Таблица users — клиенты.', $read->description());
     assertContains('INSERT, UPDATE, DELETE', $full->description());
     assertSame('billing_sql', $full->name());
-});
-
-test('TextTable: кириллица выравнивается по символам', function (): void {
-    $table = TextTable::render([['город', 'n'], ['Тула', '1'], ['Москва', '22']]);
-
-    assertSame("город  | n\n-------+---\nТула   | 1\nМосква | 22", $table);
 });
