@@ -35,7 +35,14 @@ $client = AiClient::fromEnv();
 // --- 1. tool_choice: 'required' — модель обязана вызвать хоть что-то --------
 // Вопрос не требует инструментов, но настройка заставляет модель действовать.
 
-$forced = new Agent($client, $tools, 'Отвечай одной строкой.', 3, 'required');
+$forced = new Agent(
+    $client,
+    $tools,
+    'Отвечай одной строкой. Время, расчёты и другие факты узнавай только вызовом инструмента, '
+        . 'из головы их не бери. Когда инструменты вернут результат, напиши по нему итоговый ответ текстом.',
+    3,
+    'required',
+);
 
 echo "1) tool_choice=required\n";
 echo '   ответ: ' . $forced->ask('Поздоровайся со мной.') . PHP_EOL;
@@ -54,7 +61,10 @@ echo PHP_EOL;
 $blocked = new Agent(
     client: $client,
     tools: $tools,
-    systemPrompt: 'Отвечай одной строкой.',
+    systemPrompt: 'Отвечай одной строкой. '
+        . 'Время, расчёты и другие факты узнавай только вызовом инструмента, из головы их не бери. '
+        . 'Когда инструменты вернут результат, напиши по нему итоговый ответ текстом. '
+        . 'Если инструмент недоступен — так и скажи.',
     maxRounds: 3,
     toolApproval: static function (string $name, array $arguments): bool {
         echo '   запрос: ' . $name . ' ' . json_encode($arguments, JSON_UNESCAPED_UNICODE) . PHP_EOL;

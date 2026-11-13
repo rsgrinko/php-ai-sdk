@@ -48,7 +48,7 @@ $agent = new Agent(
     client: AiClient::fromEnv(timeout: 120.0),
     tools: $tools,
     systemPrompt: 'Данные бери только из csv_query (файл orders.csv), считай через calculator. '
-        . 'Отвечай кратко.',
+        . 'Отвечай кратко. Когда инструменты вернут результат, напиши по нему итоговый ответ текстом.',
     maxRounds: 6,
 );
 

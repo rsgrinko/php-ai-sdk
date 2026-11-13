@@ -41,7 +41,9 @@ $hooks = new AgentHooks(
 $agent = new Agent(
     client: AiClient::fromEnv(timeout: 120.0),
     tools: $tools,
-    systemPrompt: 'Отвечай кратко, одной строкой.',
+    systemPrompt: 'Отвечай кратко, одной строкой. '
+        . 'Время, расчёты и другие факты узнавай только вызовом инструмента, из головы их не бери. '
+        . 'Когда инструменты вернут результат, напиши по нему итоговый ответ текстом.',
     maxRounds: 4,
     hooks: $hooks,
 );
@@ -56,7 +58,9 @@ echo PHP_EOL . '2) shouldStop: остановка после первого ра
 $stopped = new Agent(
     client: AiClient::fromEnv(timeout: 120.0),
     tools: $tools,
-    systemPrompt: 'Отвечай кратко.',
+    systemPrompt: 'Отвечай кратко. '
+        . 'Время, расчёты и другие факты узнавай только вызовом инструмента, из головы их не бери. '
+        . 'Когда инструменты вернут результат, напиши по нему итоговый ответ текстом.',
     maxRounds: 4,
     hooks: new AgentHooks(
         onStep: static fn (int $step, int $max) => print("шаг {$step}/{$max}" . PHP_EOL),

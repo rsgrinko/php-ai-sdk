@@ -36,7 +36,9 @@ $client = new LoggingClient(
 
 $tools = (new ToolRegistry())->add(new TimeTool(), new CalculatorTool());
 
-$agent = new Agent($client, $tools, 'Отвечай кратко, одной строкой.', 3);
+$agent = new Agent($client, $tools, 'Отвечай кратко, одной строкой. '
+    . 'Время, расчёты и другие факты узнавай только вызовом инструмента, из головы их не бери. '
+    . 'Когда инструменты вернут результат, напиши по нему итоговый ответ текстом.', 3);
 
 echo PHP_EOL . 'ответ: ' . $agent->ask('Который час в Москве и сколько будет 2+2?') . PHP_EOL;
 

@@ -58,7 +58,8 @@ echo '1) только чтение' . PHP_EOL;
 $reader = new Agent(
     client: AiClient::fromEnv(timeout: 120.0),
     tools: (new ToolRegistry())->add($connect(readOnly: true)),
-    systemPrompt: 'Ты аналитик базы данных. Данные получай только через sql_query. Отвечай кратко.',
+    systemPrompt: 'Ты аналитик базы данных. Данные получай только через sql_query, не выдумывай. '
+        . 'Когда инструменты вернут результат, напиши по нему итоговый ответ текстом. Отвечай кратко.',
     maxRounds: 6,
 );
 
@@ -78,7 +79,8 @@ echo PHP_EOL . '2) полный доступ, ограниченный toolAppro
 $writer = new Agent(
     client: AiClient::fromEnv(timeout: 120.0),
     tools: (new ToolRegistry())->add($connect(readOnly: false)),
-    systemPrompt: 'Ты работаешь с базой через sql_query, по одному запросу за вызов. Отвечай кратко.',
+    systemPrompt: 'Ты работаешь с базой через sql_query, по одному запросу за вызов. '
+        . 'Когда инструменты вернут результат, напиши по нему итоговый ответ текстом. Отвечай кратко.',
     maxRounds: 8,
     parallelToolCalls: false,
     toolApproval: static fn (string $name, array $args): bool

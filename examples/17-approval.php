@@ -50,7 +50,9 @@ $approval = static function (string $name, array $args): bool {
 $agent = new Agent(
     client: AiClient::fromEnv(timeout: 120.0),
     tools: $tools,
-    systemPrompt: 'Ты работаешь с файлами через инструменты. Отвечай кратко.',
+    systemPrompt: 'Ты работаешь с файлами через инструменты. Отвечай кратко. '
+        . 'Время, расчёты и другие факты узнавай только вызовом инструмента, из головы их не бери. '
+        . 'Когда инструменты вернут результат, напиши по нему итоговый ответ текстом.',
     maxRounds: 5,
     toolApproval: $approval,
 );
