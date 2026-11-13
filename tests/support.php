@@ -4,34 +4,8 @@ declare(strict_types=1);
 
 // Общие помощники и заглушки для тестов.
 
-use AiSdk\Agent;
 use AiSdk\ChatClient;
 use AiSdk\ChatResult;
-use AiSdk\HttpTransport;
-use AiSdk\HttpRequest;
-use AiSdk\LoggingClient;
-use AiSdk\Tool;
-use AiSdk\ToolRegistry;
-use AiSdk\Tools\CalculatorTool;
-use AiSdk\Tools\ConvertUnitsTool;
-use AiSdk\Tools\CsvQueryTool;
-use AiSdk\Tools\DateCalcTool;
-use AiSdk\Tools\FileSandbox;
-use AiSdk\Tools\FindFilesTool;
-use AiSdk\Tools\JsonQueryTool;
-use AiSdk\Tools\FinishTool;
-use AiSdk\Tools\HashTool;
-use AiSdk\Tools\HttpRequestTool;
-use AiSdk\Tools\ListDirTool;
-use AiSdk\Tools\ReadFileTool;
-use AiSdk\Tools\ReplaceInFileTool;
-use AiSdk\Tools\SearchFilesTool;
-use AiSdk\Tools\ShellTool;
-use AiSdk\Tools\TimeTool;
-use AiSdk\Tools\WriteFileTool;
-use AiSdk\Tools\UuidTool;
-
-
 
 /**
  * Тесты SDK: без сети, без модели и без API-ключа.
@@ -44,7 +18,6 @@ use AiSdk\Tools\UuidTool;
  */
 
 require dirname(__DIR__) . '/bootstrap.php';
-
 
 mb_internal_encoding('UTF-8');
 

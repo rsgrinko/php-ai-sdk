@@ -99,6 +99,4 @@ final class ListDirTool implements Tool
 
         return $text;
     }
-
 }
-

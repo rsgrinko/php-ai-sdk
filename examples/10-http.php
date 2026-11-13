@@ -17,7 +17,7 @@ declare(strict_types=1);
 
 require dirname(__DIR__) . '/bootstrap.php';
 
-use AiSdk\HttpRequest;
+use AiSdk\Tools\Support\HttpRequest;
 use AiSdk\Tools\HttpRequestTool;
 
 // 1. Сборка запроса — то же, что делает инструмент внутри.

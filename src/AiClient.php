@@ -19,6 +19,8 @@ final class AiClient implements ChatClient
      *                          false — только для локальной отладки.
      * @param string $caInfo    путь к своему CA-бандлу (cacert.pem). Пусто —
      *                          системные сертификаты PHP/OpenSSL.
+     * @param Retry  $retry     повторы при 429/5xx и обрыве связи;
+     *                          Retry::none() — отключить
      */
     public function __construct(
         private readonly string $apiKey,
@@ -30,6 +32,7 @@ final class AiClient implements ChatClient
         private readonly array $extraBody = [],
         private readonly bool $verifySsl = true,
         private readonly string $caInfo = '',
+        private readonly Retry $retry = new Retry(),
     ) {
     }
 
@@ -59,6 +62,7 @@ final class AiClient implements ChatClient
             extraBody: $extraBody,
             verifySsl: Env::bool('AI_VERIFY_SSL', true),
             caInfo: Env::get('AI_CAINFO', '') ?? '',
+            retry: new Retry(maxRetries: max(0, Env::int('AI_MAX_RETRIES', 2))),
         );
     }
 
@@ -83,19 +87,22 @@ final class AiClient implements ChatClient
 
         $body = array_merge($body, $this->extraBody);
 
+        $payload = (string) json_encode(
+            $body,
+            JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE
+        );
+
         // Транспорт живёт в Http: TLS, CAINFO, таймауты и ошибки — в одном месте.
-        $response = HttpTransport::request(
+        // Retry повторяет запрос при 429/5xx и обрыве связи.
+        $response = $this->retry->run(fn (): array => HttpTransport::request(
             url: rtrim($this->baseUrl, '/') . '/chat/completions',
             timeout: $this->timeout,
             follow: false,
             maxBytes: 1048576,
             method: 'POST',
             headers: $this->requestHeaders(),
-            body: (string) json_encode(
-                $body,
-                JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE
-            ),
-        );
+            body: $payload,
+        ));
 
         $status = $response['status'];
         $raw = $response['body'];

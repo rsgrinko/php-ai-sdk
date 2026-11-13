@@ -129,6 +129,4 @@ final class ReadFileTool implements Tool
 
         return 'Файл ' . $path . ', строки ' . $from . '–' . $to . ' из ' . $total . ":\n" . $text;
     }
-
 }
-

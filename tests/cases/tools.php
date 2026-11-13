@@ -240,4 +240,13 @@ test('json_query: битый JSON', function (): void {
     assertContains('Некорректный JSON', $result);
 });
 
+test('json_query: варианты записи пути', function (): void {
+    $json = '{"data":{"items":[{"id":42},{"id":7}]}}';
+    $tool = new JsonQueryTool();
+
+    assertSame('$.data.items[1].id = 7', $tool->handle(['json' => $json, 'path' => '$.data.items[1].id']));
+    assertSame('data[items][0][id] = 42', $tool->handle(['json' => $json, 'path' => 'data[items][0][id]']));
+    assertContains('Не закрыта', $tool->handle(['json' => $json, 'path' => 'data.items[0']));
+});
+
 

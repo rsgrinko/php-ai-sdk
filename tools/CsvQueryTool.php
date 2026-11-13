@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace AiSdk\Tools;
 
 use AiSdk\Tool;
+use AiSdk\Tools\Support\Bytes;
 
 /**
  * Выборка из CSV-файла внутри песочницы.
@@ -54,156 +55,107 @@ final class CsvQueryTool implements Tool
     {
         $path = (string) ($args['path'] ?? '');
         $limit = (int) ($args['limit'] ?? 20);
+        $limit = $limit < 1 ? 20 : min($limit, self::MAX_ROWS);
         $delimiter = (string) ($args['delimiter'] ?? ',');
         $delimiter = $delimiter !== '' ? $delimiter[0] : ',';
 
-        if ($limit < 1) {
-            $limit = 20;
-        }
-
-        $limit = min($limit, self::MAX_ROWS);
-
         try {
-            $file = $this->sandbox->resolve($path);
+            [$header, $rows] = $this->read($path, $delimiter);
+            $columns = $this->columnIndexes($header, (string) ($args['columns'] ?? ''));
+            $filter = $this->parseWhere($header, (string) ($args['where'] ?? ''));
         } catch (\RuntimeException $e) {
             return $e->getMessage();
         }
 
-        if (!is_file($file)) {
-            return 'Это не файл: ' . $path;
+        $table = [array_map(static fn (int $i): string => $header[$i], $columns)];
+
+        foreach ($rows as $row) {
+            if ($filter !== null && !$this->matches($row, $filter)) {
+                continue;
+            }
+
+            $table[] = array_map(fn (int $i): string => $this->cell($row[$i] ?? ''), $columns);
+
+            if (count($table) > $limit) {
+                break;
+            }
         }
 
-        $size = filesize($file);
+        $found = count($table) - 1;
 
-        if ($size !== false && $size > self::MAX_BYTES) {
-            return 'CSV слишком большой: ' . round($size / 1048576, 1) . ' МБ (максимум 5 МБ).';
+        if ($found === 0) {
+            return 'Подходящих строк нет (всего строк: ' . count($rows) . ').';
+        }
+
+        return 'CSV ' . $path . ': ' . $found . ' из ' . count($rows) . " строк\n" . $this->render($table);
+    }
+
+    /**
+     * Заголовок и строки файла.
+     *
+     * @return array{0: list<string>, 1: list<list<string>>}
+     * @throws \RuntimeException
+     */
+    private function read(string $path, string $delimiter): array
+    {
+        $file = $this->sandbox->resolve($path);
+
+        if (!is_file($file)) {
+            throw new \RuntimeException('Это не файл: ' . $path);
+        }
+
+        $size = (int) filesize($file);
+
+        if ($size > self::MAX_BYTES) {
+            throw new \RuntimeException('CSV слишком большой: ' . Bytes::human($size) . ' (максимум 5 МБ).');
         }
 
         $handle = fopen($file, 'rb');
 
         if ($handle === false) {
-            return 'Не удалось открыть файл.';
+            throw new \RuntimeException('Не удалось открыть файл.');
         }
 
-        $header = fgetcsv($handle, 0, $delimiter);
-
-        if ($header === false || $header === [null] || $header === []) {
-            fclose($handle);
-
-            return 'Не удалось прочитать заголовок CSV.';
-        }
-
-        $header = array_map(static fn ($name): string => trim((string) $name), $header);
-
-        $requested = $this->requestedColumns($header, (string) ($args['columns'] ?? ''));
-
-        if (is_string($requested)) {
-            fclose($handle);
-
-            return $requested;
-        }
-
-        $filter = $this->parseWhere($header, (string) ($args['where'] ?? ''));
-
-        if (is_string($filter)) {
-            fclose($handle);
-
-            return $filter;
-        }
-
-        $allRows = $this->readRows($handle, $delimiter);
-        fclose($handle);
-
-        $total = count($allRows);
-        $rows = $this->pickRows($allRows, $header, $requested, $filter, $limit);
-
-        if ($rows === []) {
-            return 'Подходящих строк нет (всего строк: ' . $total . ').';
-        }
-
-        $table = [array_map(static fn (int $i): string => $header[$i], $requested)];
-        $table = array_merge($table, $rows);
-
-        return 'CSV ' . $path . ': ' . count($rows) . ' из ' . $total . " строк\n" . $this->render($table);
-    }
-
-    /**
-     * @param resource $handle
-     * @return list<list<string>>
-     */
-    private function readRows($handle, string $delimiter): array
-    {
         $rows = [];
 
         while (($row = fgetcsv($handle, 0, $delimiter)) !== false) {
             $rows[] = array_map(static fn ($cell): string => trim((string) $cell), $row);
         }
 
-        return $rows;
-    }
+        fclose($handle);
 
-    /**
-     * @param list<list<string>> $allRows
-     * @param list<string> $header
-     * @param list<int> $requested
-     * @param array{index: int, value: string, contains: bool}|null $filter
-     * @return list<list<string>>
-     */
-    private function pickRows(array $allRows, array $header, array $requested, ?array $filter, int $limit): array
-    {
-        $rows = [];
+        $header = array_shift($rows);
 
-        foreach ($allRows as $row) {
-            if ($filter !== null && !$this->matches($row, $header, $filter)) {
-                continue;
-            }
-
-            $picked = [];
-
-            foreach ($requested as $index) {
-                $picked[] = $this->cell($row[$index] ?? '');
-            }
-
-            $rows[] = $picked;
-
-            if (count($rows) >= $limit) {
-                break;
-            }
+        if ($header === null || $header === ['']) {
+            throw new \RuntimeException('Не удалось прочитать заголовок CSV.');
         }
 
-        return $rows;
+        return [$header, $rows];
     }
+
     /**
      * @param list<string> $header
-     * @return list<int>|string индексы колонок или текст ошибки
+     * @return list<int> индексы нужных колонок (пусто в запросе — все)
+     * @throws \RuntimeException
      */
-    private function requestedColumns(array $header, string $columns): array|string
+    private function columnIndexes(array $header, string $columns): array
     {
         if (trim($columns) === '') {
             return array_keys($header);
         }
 
-        $wanted = array_map('trim', explode(',', $columns));
-        $indexes = [];
-
-        foreach ($wanted as $name) {
-            $index = array_search($name, $header, true);
-
-            if ($index === false) {
-                return 'Нет колонки "' . $name . '". Есть: ' . implode(', ', $header) . '.';
-            }
-
-            $indexes[] = (int) $index;
-        }
-
-        return $indexes;
+        return array_map(
+            fn (string $name): int => $this->columnIndex($header, trim($name)),
+            explode(',', $columns),
+        );
     }
 
     /**
      * @param list<string> $header
-     * @return array{index: int, value: string, contains: bool}|string|null
+     * @return array{index: int, value: string, contains: bool}|null
+     * @throws \RuntimeException
      */
-    private function parseWhere(array $header, string $where): array|string|null
+    private function parseWhere(array $header, string $where): ?array
     {
         $where = trim($where);
 
@@ -212,29 +164,36 @@ final class CsvQueryTool implements Tool
         }
 
         if (preg_match('/^([^=~]+)([=~])(.*)$/u', $where, $match) !== 1) {
-            return 'Фильтр должен быть вида "колонка=значение" или "колонка~значение".';
-        }
-
-        $column = trim($match[1]);
-        $index = array_search($column, $header, true);
-
-        if ($index === false) {
-            return 'Нет колонки "' . $column . '". Есть: ' . implode(', ', $header) . '.';
+            throw new \RuntimeException('Фильтр должен быть вида "колонка=значение" или "колонка~значение".');
         }
 
         return [
-            'index' => (int) $index,
+            'index' => $this->columnIndex($header, trim($match[1])),
             'value' => trim($match[3]),
             'contains' => $match[2] === '~',
         ];
     }
 
     /**
-     * @param list<string> $row
      * @param list<string> $header
+     * @throws \RuntimeException
+     */
+    private function columnIndex(array $header, string $name): int
+    {
+        $index = array_search($name, $header, true);
+
+        if ($index === false) {
+            throw new \RuntimeException('Нет колонки "' . $name . '". Есть: ' . implode(', ', $header) . '.');
+        }
+
+        return (int) $index;
+    }
+
+    /**
+     * @param list<string> $row
      * @param array{index: int, value: string, contains: bool} $filter
      */
-    private function matches(array $row, array $header, array $filter): bool
+    private function matches(array $row, array $filter): bool
     {
         $cell = $row[$filter['index']] ?? '';
 
@@ -253,6 +212,7 @@ final class CsvQueryTool implements Tool
             ? mb_substr($value, 0, self::CELL_MAX) . '…'
             : $value;
     }
+
 
     /**
      * @param list<list<string>> $table

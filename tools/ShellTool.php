@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace AiSdk\Tools;
 
 use AiSdk\Tool;
+use AiSdk\Tools\Support\Number;
 use AiSdk\Tools\Support\Timeout;
 
 /**
@@ -19,11 +20,38 @@ use AiSdk\Tools\Support\Timeout;
  *   - ограничение вывода, чтобы не раздувать контекст;
  *   - необязательный allowlist по первой команде.
  *
+ * Allowlist ограничивает только программу, а не то, что она сделает.
+ * Поэтому при заданном allowlist запрещены метасимволы оболочки (; & | ` $
+ * < > ( ) и перевод строки) — иначе «git status; rm -rf ~» прошла бы как git.
+ * Но и разрешённая программа может исполнять код сама: php -r, git -c
+ * core.pager=..., find -exec, npm run. Не кладите такие в allowlist,
+ * если модели нельзя доверять.
+ *
  * Чего здесь НЕТ: изоляции, песочницы, ограничения файловой системы.
  * Команда может делать всё, что может пользователь процесса.
  */
 final class ShellTool implements Tool
 {
+    /**
+     * Символы, которыми в bash, sh, cmd и PowerShell склеивают команды,
+     * подставляют вывод или перенаправляют его. Ключ — символ, значение —
+     * как назвать его в отказе.
+     */
+    private const META = [
+        ';' => '«;»',
+        '&' => '«&»',
+        '|' => '«|»',
+        '`' => '«`»',
+        '$' => '«$»',
+        '<' => '«<»',
+        '>' => '«>»',
+        '(' => '«(»',
+        ')' => '«)»',
+        "\n" => 'перевода строки',
+        "\r" => 'возврата каретки',
+        "\0" => 'нулевого байта',
+    ];
+
     private readonly ?string $workdir;
     private readonly string $shellName;
     private readonly string $tmpDir;
@@ -91,12 +119,17 @@ final class ShellTool implements Tool
             return 'Пустая команда.';
         }
 
+        if ($this->allow !== [] && ($meta = $this->findMeta($command)) !== null) {
+            return 'Команда отклонена: при включённом allowlist нельзя использовать символ ' . $meta . '. '
+                . 'Разрешена одна простая команда без ; & | ` $ < > ( ) и перевода строки.';
+        }
+
         if (!$this->isAllowed($command)) {
             return 'Команда не разрешена: "' . $this->firstWord($command) . '". '
                 . 'Разрешены: ' . implode(', ', $this->allow) . '.';
         }
 
-        $timeout = Timeout::from($args, $this->timeout, $this->maxTimeout);
+        $timeout = Timeout::seconds($args, $this->timeout, $this->maxTimeout);
 
         try {
             $commandLine = $this->commandLine($command);
@@ -119,7 +152,7 @@ final class ShellTool implements Tool
         [$outFile, $errFile] = $files;
 
         try {
-            $run = $this->run($commandLine, $cwd, $outFile, $errFile, $timeout->seconds);
+            $run = $this->run($commandLine, $cwd, $outFile, $errFile, $timeout);
         } catch (\RuntimeException $e) {
             return $e->getMessage();
         } finally {
@@ -129,7 +162,7 @@ final class ShellTool implements Tool
             @unlink($errFile);
         }
 
-        return $this->format($command, $stdout, $stderr, $run['timedOut'], $run['overflow'], $run['exitCode'], $timeout->seconds);
+        return $this->format($command, $stdout, $stderr, $run['timedOut'], $run['overflow'], $run['exitCode'], $timeout);
     }
 
     /**
@@ -279,6 +312,20 @@ final class ShellTool implements Tool
         return false;
     }
 
+    /**
+     * Первый запрещённый метасимвол в команде (в читаемом виде) или null.
+     */
+    private function findMeta(string $command): ?string
+    {
+        foreach (self::META as $char => $label) {
+            if (str_contains($command, (string) $char)) {
+                return $label;
+            }
+        }
+
+        return null;
+    }
+
     private function firstWord(string $command): string
     {
         $parts = preg_split('/\s+/', trim($command));
@@ -311,7 +358,7 @@ final class ShellTool implements Tool
         $lines = ['$ ' . $command];
 
         $lines[] = match (true) {
-            $timedOut => 'exit: таймаут ' . Timeout::format($timeout) . ' с (процесс завершён)',
+            $timedOut => 'exit: таймаут ' . Number::format($timeout, 1) . ' с (процесс завершён)',
             $overflow => 'exit: вывод превысил лимит, процесс завершён',
             default => 'exit: ' . $exitCode,
         };

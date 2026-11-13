@@ -6,7 +6,6 @@
 
 | Нужно | Куда добавить |
 |---|---|
-| Повторы при 429/5xx | цикл в `AiClient::chat()` вокруг `post()` |
 | Стриминг ответа | `stream: true` + чтение чанков (сложнее, отдельный метод) |
 | Логирование запросов в БД | обёртка над `ChatClient` (декоратор), 20 строк |
 | Память между запусками | сохранить `$agent->messages()` в JSON/БД |
@@ -55,6 +54,10 @@ $client = AiClient::fromEnv();
 $result = $client->chat($messages, $tools = [], $options = []);
 // options: tool_choice, parallel_tool_calls, temperature, max_tokens
 $result->text; $result->toolCalls; $result->usage;
+
+// Повторы при 429/5xx и обрыве связи (по умолчанию 2, AI_MAX_RETRIES)
+$client = new AiClient($key, retry: new Retry(maxRetries: 3, baseDelay: 0.5, maxDelay: 30.0));
+$client = new AiClient($key, retry: Retry::none());
 
 // Расход и стоимость
 $agent->usage();                         // [prompt_tokens, completion_tokens] за диалог

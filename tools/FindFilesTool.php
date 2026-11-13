@@ -13,7 +13,6 @@ use AiSdk\Tools\Support\FileWalker;
  */
 final class FindFilesTool implements Tool
 {
-
     public function __construct(
         private readonly FileSandbox $sandbox,
         private readonly int $defaultLimit = 100,
@@ -99,9 +98,4 @@ final class FindFilesTool implements Tool
         return 'Найдено ' . count($found) . ($truncated ? ' (обрезано по лимиту ' . $limit . ')' : '') . ":\n"
             . implode("\n", $found);
     }
-
-    /**
-     * @param callable(string): void $onFile
-     */
-
 }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace AiSdk\Tools;
 
 use AiSdk\Tool;
+use AiSdk\Tools\Support\Number;
 
 /**
  * Арифметика без eval(): рекурсивный спуск по выражению.
@@ -77,7 +78,7 @@ final class CalculatorTool implements Tool
             return 'Результат не является числом (деление на ноль?).';
         }
 
-        return $expression . ' = ' . $this->format($value);
+        return $expression . ' = ' . Number::format($value);
     }
 
     private function parseExpression(): float
@@ -177,14 +178,5 @@ final class CalculatorTool implements Tool
     private function peek(): string
     {
         return $this->source[$this->position] ?? '';
-    }
-
-    private function format(float $value): string
-    {
-        if (abs($value - round($value)) < 1e-9) {
-            return (string) (int) round($value);
-        }
-
-        return rtrim(rtrim(number_format($value, 10, '.', ''), '0'), '.');
     }
 }

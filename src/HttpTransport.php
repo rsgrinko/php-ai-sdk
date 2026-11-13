@@ -68,7 +68,9 @@ final class HttpTransport
      * @param bool $follow   следовать редиректам автоматически
      * @param int $maxBytes  предел тела ответа; больше — обрезаем и обрываем загрузку
      * @param array<string, string> $headers
-     * @return array{status: int, body: string, location: string|null, content_type: string|null, truncated: bool}
+     * @param list<string> $resolve строки CURLOPT_RESOLVE ("host:port:ip"): подключаться
+     *                     к заранее проверенным адресам без повторного DNS (см. UrlGuard::pin)
+     * @return array{status: int, body: string, location: string|null, content_type: string|null, retry_after: string|null, truncated: bool}
      */
     public static function request(
         string $url,
@@ -78,6 +80,7 @@ final class HttpTransport
         string $method = 'GET',
         array $headers = [],
         ?string $body = null,
+        array $resolve = [],
     ): array {
         $ch = curl_init($url);
 
@@ -90,6 +93,7 @@ final class HttpTransport
         $truncated = false;
         $location = null;
         $contentType = null;
+        $retryAfter = null;
         $limit = max(1024, $maxBytes);
 
         $verify = Env::bool('AI_VERIFY_SSL', true);
@@ -119,13 +123,15 @@ final class HttpTransport
 
                 return strlen($chunk);
             },
-            CURLOPT_HEADERFUNCTION => static function ($handle, string $line) use (&$location, &$contentType): int {
+            CURLOPT_HEADERFUNCTION => static function ($handle, string $line) use (&$location, &$contentType, &$retryAfter): int {
                 $lower = strtolower($line);
 
                 if (str_starts_with($lower, 'location:')) {
                     $location = trim(substr($line, 9));
                 } elseif (str_starts_with($lower, 'content-type:')) {
                     $contentType = trim(substr($line, 13));
+                } elseif (str_starts_with($lower, 'retry-after:')) {
+                    $retryAfter = trim(substr($line, 12));
                 }
 
                 return strlen($line);
@@ -138,6 +144,10 @@ final class HttpTransport
 
         if (strtoupper($method) === 'HEAD') {
             $options[CURLOPT_NOBODY] = true;
+        }
+
+        if ($resolve !== []) {
+            $options[CURLOPT_RESOLVE] = $resolve;
         }
 
         $caInfo = Env::get('AI_CAINFO', '') ?? '';
@@ -158,7 +168,8 @@ final class HttpTransport
         if ($errno !== 0 && !($truncated && $errno === 23)) {
             throw new AiException(
                 'HTTP-ошибка: ' . ($error !== '' ? $error : 'код ' . $errno)
-                . self::tlsHint($error, $verify)
+                . self::tlsHint($error, $verify),
+                $errno, // код cURL: по нему Retry отличает таймаут от обрыва связи
             );
         }
 
@@ -167,6 +178,7 @@ final class HttpTransport
             'body' => $response,
             'location' => $location,
             'content_type' => $contentType,
+            'retry_after' => $retryAfter,
             'truncated' => $truncated,
         ];
     }

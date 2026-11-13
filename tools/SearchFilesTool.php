@@ -184,8 +184,4 @@ final class SearchFilesTool implements Tool
 
         return $matches;
     }
-
-    /**
-     * @param callable(string): void $onFile
-     */
 }

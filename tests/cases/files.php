@@ -133,6 +133,28 @@ test('csv_query: неизвестная колонка — понятная ош
     assertContains('name, city', $result);
 });
 
+test('csv_query: ошибки ввода — текстом, а не исключением', function (): void {
+    $dir = testDir();
+    file_put_contents($dir . '/people.csv', "name,city\nИван,Тула\n");
+    file_put_contents($dir . '/empty.csv', '');
+    $tool = new CsvQueryTool(new FileSandbox($dir));
+
+    assertContains('Фильтр должен быть', $tool->handle(['path' => 'people.csv', 'where' => 'city']));
+    assertContains('Нет колонки "age"', $tool->handle(['path' => 'people.csv', 'columns' => 'name, age']));
+    assertContains('заголовок', $tool->handle(['path' => 'empty.csv']));
+    assertContains('Путь не найден', $tool->handle(['path' => 'nope.csv']));
+});
+
+test('csv_query: лимит считает строки без заголовка', function (): void {
+    $dir = testDir();
+    file_put_contents($dir . '/n.csv', "n\n1\n2\n3\n4\n");
+
+    $result = (new CsvQueryTool(new FileSandbox($dir)))->handle(['path' => 'n.csv', 'limit' => 2]);
+
+    assertContains('2 из 4 строк', $result);
+    assertTrue(!str_contains($result, '3'), 'лишняя строка: ' . $result);
+});
+
 // ---------------------------------------------------------------------------
 // Запись и правка файлов
 // ---------------------------------------------------------------------------
@@ -225,6 +247,21 @@ test('replace_in_file: несколько совпадений требуют al
     ]);
 
     assertContains('Найдено совпадений: 2', $result);
+});
+
+test('replace_in_file: all заменяет все и сообщает сколько', function (): void {
+    $dir = testDir();
+    file_put_contents($dir . '/code.txt', "x\nx\nx\n");
+
+    $result = (new ReplaceInFileTool(new FileSandbox($dir)))->handle([
+        'path' => 'code.txt',
+        'search' => 'x',
+        'replace' => 'y',
+        'all' => true,
+    ]);
+
+    assertContains('Заменено вхождений: 3', $result);
+    assertSame("y\ny\ny\n", file_get_contents($dir . '/code.txt'));
 });
 
 test('replace_in_file: не найдено — понятная ошибка', function (): void {

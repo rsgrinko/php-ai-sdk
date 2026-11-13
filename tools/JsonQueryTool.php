@@ -105,55 +105,17 @@ final class JsonQueryTool implements Tool
     }
 
     /**
-     * data.items[0].id -> ['data','items','0','id']
+     * data.items[0].id -> ['data', 'items', '0', 'id']. Ведущий "$." допускается.
      *
      * @return list<string>
      */
     private function tokenize(string $path): array
     {
-        $path = trim($path);
-        $path = preg_replace('/^\$?\.?/', '', $path) ?? $path;
-
-        $tokens = [];
-        $buffer = '';
-        $length = strlen($path);
-
-        for ($i = 0; $i < $length; $i++) {
-            $char = $path[$i];
-
-            if ($char === '.') {
-                if ($buffer !== '') {
-                    $tokens[] = $buffer;
-                    $buffer = '';
-                }
-
-                continue;
-            }
-
-            if ($char === '[') {
-                if ($buffer !== '') {
-                    $tokens[] = $buffer;
-                    $buffer = '';
-                }
-
-                $end = strpos($path, ']', $i);
-
-                if ($end === false) {
-                    throw new \InvalidArgumentException('Не закрыта квадратная скобка в path.');
-                }
-
-                $tokens[] = substr($path, $i + 1, $end - $i - 1);
-                $i = $end;
-
-                continue;
-            }
-
-            $buffer .= $char;
+        if (substr_count($path, '[') !== substr_count($path, ']')) {
+            throw new \InvalidArgumentException('Не закрыта квадратная скобка в path.');
         }
 
-        if ($buffer !== '') {
-            $tokens[] = $buffer;
-        }
+        $tokens = preg_split('/[.\[\]]+/', ltrim(trim($path), '$'), -1, PREG_SPLIT_NO_EMPTY) ?: [];
 
         if ($tokens === []) {
             throw new \InvalidArgumentException('Пустой path.');

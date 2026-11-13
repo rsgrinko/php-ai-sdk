@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 // Тесты: http. Запускаются из tests/run.php.
 
+use AiSdk\AiException;
 use AiSdk\HttpTransport;
-use AiSdk\HttpRequest;
+use AiSdk\Tools\Support\HttpRequest;
 use AiSdk\Tool;
 use AiSdk\Tools\HttpRequestTool;
+use AiSdk\Tools\Support\UrlGuard;
 
 // ---------------------------------------------------------------------------
 // http_request: сборка запроса (без сети)
@@ -116,6 +118,107 @@ test('http_request: allowPrivate снимает блокировку внутр�
         !str_contains($result, 'приватному адресу'),
         'с allowPrivate адрес не должен блокироваться: ' . $result
     );
+});
+
+// ---------------------------------------------------------------------------
+// UrlGuard: IPv6, закрепление адресов (DNS rebinding)
+// ---------------------------------------------------------------------------
+
+/**
+ * UrlGuard с подменённым DNS: хост → заданные адреса.
+ *
+ * @param array<string, list<string>> $dns
+ */
+function guardWithDns(array $dns): UrlGuard
+{
+    return new UrlGuard(resolver: static fn (string $host): array => $dns[$host] ?? []);
+}
+
+test('url_guard: публичный хост закрепляется на проверенных адресах', function (): void {
+    $guard = guardWithDns(['api.example.com' => ['93.184.216.34', '2606:2800:220:1::1']]);
+
+    assertSame(
+        ['api.example.com:443:93.184.216.34,[2606:2800:220:1::1]'],
+        $guard->pin('https://api.example.com/v1')
+    );
+    assertSame(
+        ['api.example.com:8080:93.184.216.34,[2606:2800:220:1::1]'],
+        $guard->pin('http://api.example.com:8080/')
+    );
+});
+
+test('url_guard: один приватный адрес среди публичных — отказ', function (): void {
+    $guard = guardWithDns([
+        'mixed.example' => ['93.184.216.34', '127.0.0.1'],
+        'v6.example' => ['93.184.216.34', '::1'],
+    ]);
+
+    assertThrows(static fn () => $guard->pin('https://mixed.example/'));
+    assertThrows(static fn () => $guard->pin('https://v6.example/'));
+});
+
+test('url_guard: хост без адресов — отказ', function (): void {
+    assertThrows(static fn () => guardWithDns([])->pin('https://nowhere.example/'));
+});
+
+test('url_guard: приватные и служебные IPv6 запрещены', function (): void {
+    foreach ([
+        '::1',               // loopback
+        '::ffff:127.0.0.1',  // IPv4-mapped
+        'fc00::1',           // ULA
+        'fe80::1',           // link-local
+        '64:ff9b::7f00:1',   // NAT64 → 127.0.0.1
+        '64:ff9b::a00:5',    // NAT64 → 10.0.0.5
+        '2002:7f00:1::1',    // 6to4 → 127.0.0.1
+        '2001:db8::1',       // документационный
+    ] as $ip) {
+        assertTrue(!UrlGuard::isPublicIp($ip), 'должен быть запрещён: ' . $ip);
+    }
+
+    assertTrue(UrlGuard::isPublicIp('2606:4700::1111'), 'публичный IPv6');
+    assertTrue(UrlGuard::isPublicIp('64:ff9b::808:808'), 'NAT64 → 8.8.8.8 — публичный');
+    assertTrue(!UrlGuard::isPublicIp('100.64.1.1'), 'CGNAT');
+});
+
+test('url_guard: IPv6-литерал в URL проверяется', function (): void {
+    $tool = new HttpRequestTool();
+
+    assertContains('приватному адресу', $tool->handle(['url' => 'http://[::1]/x']));
+    assertContains('приватному адресу', $tool->handle(['url' => 'http://[::ffff:127.0.0.1]/x']));
+});
+
+test('url_guard: *.localhost запрещён', function (): void {
+    assertContains('локальному адресу', (new HttpRequestTool())->handle(['url' => 'http://app.localhost/']));
+});
+
+test('http: cURL подключается к закреплённому адресу, а не резолвит имя', function (): void {
+    // Имя в зоне .invalid не резолвится никогда. Если cURL пошёл
+    // по закреплённому 127.0.0.1, ошибка будет про соединение, а не про DNS.
+    // Прокси из окружения резолвит имена сам, поэтому для теста его обходим.
+    $noProxy = getenv('NO_PROXY');
+    putenv('NO_PROXY=pinned.invalid');
+
+    try {
+        $control = '';
+        $pinned = '';
+
+        try {
+            HttpTransport::request('http://pinned.invalid:9/', 2.0);
+        } catch (AiException $e) {
+            $control = $e->getMessage();
+        }
+
+        try {
+            HttpTransport::request('http://pinned.invalid:9/', 2.0, resolve: ['pinned.invalid:9:127.0.0.1']);
+        } catch (AiException $e) {
+            $pinned = $e->getMessage();
+        }
+    } finally {
+        putenv($noProxy === false ? 'NO_PROXY' : 'NO_PROXY=' . $noProxy);
+    }
+
+    assertContains('resolve', $control, 'без закрепления имя должно не резолвиться');
+    assertTrue($pinned !== '' && stripos($pinned, 'resolve') === false, 'имя не должно резолвиться: ' . $pinned);
 });
 
 

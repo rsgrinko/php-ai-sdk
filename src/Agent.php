@@ -230,28 +230,39 @@ final class Agent
 
         $this->hooks?->toolStart($call['name'], $call['arguments']);
 
-        if ($this->toolApproval !== null && !$this->approve($call['name'], $call['arguments'])) {
+        if (!$this->approve($call['name'], $call['arguments'])) {
             $blocked = true;
             $output = 'Вызов инструмента "' . $call['name'] . '" отклонён оператором.';
         } else {
             $output = $this->tools->execute($call['name'], $call['arguments']);
         }
 
-        $this->trace[] = [
-            'name' => $call['name'],
-            'arguments' => $call['arguments'],
-            'output' => $output,
-            'ms' => (int) round((microtime(true) - $started) * 1000),
-            'blocked' => $blocked,
-        ];
-
-        $this->hooks?->toolEnd($this->trace[count($this->trace) - 1]);
+        $this->record($call, $output, (int) round((microtime(true) - $started) * 1000), $blocked);
 
         return [
             'role' => 'tool',
             'tool_call_id' => $call['id'],
             'content' => $output,
         ];
+    }
+
+    /**
+     * Записать вызов в трассировку и сообщить хуку.
+     *
+     * @param array{id: string, name: string, arguments: array<string, mixed>} $call
+     */
+    private function record(array $call, string $output, int $ms, bool $blocked): void
+    {
+        $step = [
+            'name' => $call['name'],
+            'arguments' => $call['arguments'],
+            'output' => $output,
+            'ms' => $ms,
+            'blocked' => $blocked,
+        ];
+
+        $this->trace[] = $step;
+        $this->hooks?->toolEnd($step);
     }
 
     /**
@@ -280,16 +291,7 @@ final class Agent
             if ($this->isFinishCall($call)) {
                 $this->hooks?->toolStart($call['name'], $call['arguments']);
                 $finished = $this->finishResult($call);
-
-                $this->trace[] = [
-                    'name' => $call['name'],
-                    'arguments' => $call['arguments'],
-                    'output' => $finished,
-                    'ms' => 0,
-                    'blocked' => false,
-                ];
-
-                $this->hooks?->toolEnd($this->trace[count($this->trace) - 1]);
+                $this->record($call, $finished, 0, false);
 
                 $this->messages[] = [
                     'role' => 'tool',
@@ -459,10 +461,6 @@ final class Agent
 
         return $result;
     }
-
-    /**
-     * Быстрый старт: агент с инструментами по умолчанию.
-     */
 }
 
 

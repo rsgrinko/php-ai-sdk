@@ -90,9 +90,8 @@ final class ReplaceInFileTool implements Tool
             return 'Найдено совпадений: ' . $count . '. Уточни search или передай all: true.';
         }
 
-        $updated = $all
-            ? str_replace($search, $replace, $content)
-            : $this->replaceOnce($content, $search, $replace);
+        // Здесь совпадение либо одно, либо all: true — str_replace подходит в обоих случаях.
+        $updated = str_replace($search, $replace, $content);
 
         try {
             AtomicWriter::write($file, $updated);
@@ -100,23 +99,9 @@ final class ReplaceInFileTool implements Tool
             return $e->getMessage();
         }
 
-        return 'Заменено вхождений: ' . ($all ? $count : 1)
+        return 'Заменено вхождений: ' . $count
             . ', файл ' . $this->sandbox->relative($file)
             . ': ' . strlen($updated) . ' Б.';
-    }
-
-    /**
-     * Заменить только первое вхождение, не трогая остальные.
-     */
-    private function replaceOnce(string $content, string $search, string $replace): string
-    {
-        $position = strpos($content, $search);
-
-        if ($position === false) {
-            return $content;
-        }
-
-        return substr_replace($content, $replace, $position, strlen($search));
     }
 }
 

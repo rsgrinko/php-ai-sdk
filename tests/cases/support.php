@@ -10,32 +10,37 @@ use AiSdk\Cost;
 use AiSdk\ToolRegistry;
 use AiSdk\Tools\HttpRequestTool;
 use AiSdk\Tools\ShellTool;
+use AiSdk\Tools\CalculatorTool;
+use AiSdk\Tools\Support\Number;
 use AiSdk\Tools\Support\Timeout;
 
 test('timeout: значение модели в пределах максимума', function (): void {
-    $timeout = Timeout::from(['timeout' => 5], 10.0, 60.0);
-
-    assertSame(5.0, $timeout->seconds);
-    assertSame(false, $timeout->clamped());
+    assertSame(5.0, Timeout::seconds(['timeout' => 5], 10.0, 60.0));
 });
 
 test('timeout: без параметра берётся значение по умолчанию', function (): void {
-    assertSame(10.0, Timeout::from([], 10.0, 60.0)->seconds);
+    assertSame(10.0, Timeout::seconds([], 10.0, 60.0));
 });
 
 test('timeout: больше максимума урезается', function (): void {
-    $timeout = Timeout::from(['timeout' => 999], 10.0, 60.0);
-
-    assertSame(60.0, $timeout->seconds);
-    assertSame(true, $timeout->clamped());
+    assertSame(60.0, Timeout::seconds(['timeout' => 999], 10.0, 60.0));
 });
 
 test('timeout: меньше секунды поднимается до одной', function (): void {
-    assertSame(1.0, Timeout::from(['timeout' => 0.1], 10.0, 60.0)->seconds);
+    assertSame(1.0, Timeout::seconds(['timeout' => 0.1], 10.0, 60.0));
 });
 
 test('timeout: нечисловое значение игнорируется', function (): void {
-    assertSame(10.0, Timeout::from(['timeout' => 'abc'], 10.0, 60.0)->seconds);
+    assertSame(10.0, Timeout::seconds(['timeout' => 'abc'], 10.0, 60.0));
+});
+
+test('number: большие числа не превращаются в мусор', function (): void {
+    assertSame('4', Number::format(4.0));
+    assertSame('0.3333333333', Number::format(1 / 3));
+    assertSame('-2.5', Number::format(-2.5));
+    assertSame('0', Number::format(-0.0));
+    assertContains('E+28', Number::format(9.0 ** 30));
+    assertContains('E+28', (new CalculatorTool())->handle(['expression' => '9^30']));
 });
 
 test('tools: timeout есть в схемах run_command и http_request', function (): void {

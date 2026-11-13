@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace AiSdk\Tools;
 
 use AiSdk\HttpTransport;
-use AiSdk\HttpRequest;
+use AiSdk\Tools\Support\HttpRequest;
 use AiSdk\Tools\Support\Timeout;
 use AiSdk\Tools\Support\UrlGuard;
 use AiSdk\Tool;
@@ -122,7 +122,7 @@ final class HttpRequestTool implements Tool
 
         $maxChars = (int) ($args['max_chars'] ?? $this->defaultChars);
         $maxChars = max(200, min($maxChars, 20000));
-        $timeout = Timeout::from($args, $this->timeout, $this->maxTimeout);
+        $timeout = Timeout::seconds($args, $this->timeout, $this->maxTimeout);
 
         $body = $args['body'] ?? null;
 
@@ -153,16 +153,19 @@ final class HttpRequestTool implements Tool
             $response = null;
 
             for ($hop = 0; $hop <= self::MAX_REDIRECTS; $hop++) {
-                $this->guard->assertAllowed($url);
+                // Проверка и запрос идут на одни и те же адреса: cURL не
+                // резолвит имя второй раз (защита от DNS rebinding).
+                $pinned = $this->guard->pin($url);
 
                 $response = HttpTransport::request(
                     $url,
-                    $timeout->seconds,
+                    $timeout,
                     false,
                     self::MAX_BYTES,
                     $request->method,
                     $request->headers,
                     $request->body,
+                    $pinned,
                 );
 
                 $isRedirect = in_array($response['status'], [301, 302, 303, 307, 308], true);
@@ -228,11 +231,4 @@ final class HttpRequestTool implements Tool
 
         return $this->auth[$host] ?? null;
     }
-
-
-
-
 }
-
-
-

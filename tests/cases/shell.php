@@ -54,4 +54,35 @@ test('shell: пустая команда не запускается', function 
     assertContains('Пустая команда', (new ShellTool(tmpDir: __DIR__ . '/tmp'))->handle(['command' => '   ']));
 });
 
+test('shell: allowlist нельзя обойти склейкой команд', function (): void {
+    $tool = new ShellTool(allow: ['echo'], tmpDir: __DIR__ . '/tmp');
+
+    foreach ([
+        'echo ok; whoami',
+        'echo ok && whoami',
+        'echo ok || whoami',
+        'echo ok | whoami',
+        'echo ok & whoami',
+        'echo `whoami`',
+        'echo $(whoami)',
+        'echo ok > out.txt',
+        'echo ok < in.txt',
+        "echo ok\nwhoami",
+        "echo ok\r\nwhoami",
+        'echo (whoami)',
+    ] as $command) {
+        $result = $tool->handle(['command' => $command]);
+
+        assertContains('Команда отклонена', $result, $command);
+        assertTrue(!str_contains($result, 'exit:'), 'команда не должна запускаться: ' . $command);
+    }
+});
+
+test('shell: без allowlist метасимволы разрешены', function (): void {
+    $result = (new ShellTool(tmpDir: __DIR__ . '/tmp'))->handle(['command' => 'echo a && echo b']);
+
+    assertContains('exit: 0', $result);
+    assertContains('b', $result);
+});
+
 

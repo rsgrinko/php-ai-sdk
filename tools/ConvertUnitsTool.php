@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace AiSdk\Tools;
 
 use AiSdk\Tool;
+use AiSdk\Tools\Support\Number;
 
 /**
  * Перевод единиц: температура, длина, масса, скорость.
@@ -96,7 +97,7 @@ final class ConvertUnitsTool implements Tool
                 . 'Доступно: c, f, k, mm, cm, m, km, in, ft, yd, mi, mg, g, kg, t, oz, lb, mps, kmh, mph, kn.';
         }
 
-        return $this->format($value) . ' ' . $from . ' = ' . $this->format($result) . ' ' . $to;
+        return Number::format($value, 6) . ' ' . $from . ' = ' . Number::format($result, 6) . ' ' . $to;
     }
 
     private function convert(float $value, string $from, string $to): ?float
@@ -136,14 +137,5 @@ final class ConvertUnitsTool implements Tool
         $unit = mb_strtolower(trim($unit));
 
         return self::ALIASES[$unit] ?? $unit;
-    }
-
-    private function format(float $value): string
-    {
-        if (abs($value - round($value)) < 1e-9) {
-            return (string) (int) round($value);
-        }
-
-        return rtrim(rtrim(number_format($value, 6, '.', ''), '0'), '.');
     }
 }
