@@ -1,5 +1,12 @@
 # rsgrinko/ai-sdk
 
+[![Packagist Version](https://img.shields.io/packagist/v/rsgrinko/ai-sdk?label=packagist)](https://packagist.org/packages/rsgrinko/ai-sdk)
+[![PHP Version](https://img.shields.io/packagist/dependency-v/rsgrinko/ai-sdk/php)](https://packagist.org/packages/rsgrinko/ai-sdk)
+[![Downloads](https://img.shields.io/packagist/dt/rsgrinko/ai-sdk)](https://packagist.org/packages/rsgrinko/ai-sdk/stats)
+[![License](https://img.shields.io/packagist/l/rsgrinko/ai-sdk)](LICENSE)
+[![GitHub Stars](https://img.shields.io/github/stars/rsgrinko/php-ai-sdk?style=flat&logo=github)](https://github.com/rsgrinko/php-ai-sdk)
+[![Last Commit](https://img.shields.io/github/last-commit/rsgrinko/php-ai-sdk?logo=github)](https://github.com/rsgrinko/php-ai-sdk/commits/main)
+
 Лёгкая PHP-библиотека для агентов с вызовом инструментов поверх любого
 OpenAI-совместимого API: DeepSeek, OpenAI, OpenRouter, Ollama, llama.cpp,
 LM Studio. Без зависимостей — только PHP и `curl`.
