@@ -23,8 +23,12 @@
 | `16-dialog.php` | многоходовый диалог | — | `setSystemPrompt`, `messages`, `usage`, `reset`, `Cost` |
 | `17-approval.php` | запрет опасного действия | `list_dir`, `read_file`, `write_file` | `toolApproval` |
 | `18-errors.php` | ошибки и повторы | — | `Retry`, `Retry::none()`, `AiException` |
+| `19-database.php` | агент и MySQL | `sql_query` | `readOnly`, `toolApproval`, `DB_*` в .env |
+| `20-database-offline.php` | ответы sql_query без модели | `sql_query` | `readOnly`, `maxRows`, `name`, `about`; SQLite в памяти |
+| `21-database-chat.php` | чат с базой в терминале | `sql_query` | `toolApproval` с вопросом y/N на запись |
+| `22-database-report.php` | отчёт по базе | `sql_query`, `finish` | `about`, `hooks`, «подталкивание» до finish |
 
-`10-http.php`, `11-json.php` и `18-errors.php` работают без модели — их можно запускать
+`10-http.php`, `11-json.php`, `18-errors.php` и `20-database-offline.php` работают без модели — их можно запускать
 где угодно. Остальные обращаются к модели из `.env`.
 
 

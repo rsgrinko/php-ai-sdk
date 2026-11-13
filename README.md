@@ -72,12 +72,13 @@ tools/
   JsonQueryTool.php    значение по пути из JSON
   HttpRequestTool.php  HTTP любого метода с авторизацией
   ShellTool.php        команды оболочки (опасно)
+  DatabaseTool.php     SQL к MySQL/MariaDB: только чтение или полный доступ
   ConvertUnitsTool.php температура, длина, масса, скорость
   DateCalcTool.php     разница дат и прибавление интервала
   UuidTool.php         UUID v4
   HashTool.php         sha256/sha1/md5
   Support/             помощники: HttpRequest, UrlGuard, FileWalker, AtomicWriter,
-                       Timeout, Bytes, Number
+                       Timeout, Bytes, Number, TextTable
 examples/
   01-chat.php          простой вопрос
   02-tools.php         агент с тремя инструментами
@@ -97,6 +98,10 @@ examples/
   16-dialog.php        память диалога, смена роли, reset, стоимость
   17-approval.php      запрет записи через toolApproval
   18-errors.php        AiException и повторы при недоступной модели
+  19-database.php      агент с доступом к MySQL
+  20-database-offline.php  DatabaseTool без модели (SQLite в памяти)
+  21-database-chat.php чат с базой: чтение сразу, запись с подтверждением
+  22-database-report.php   отчёт по базе через finish
 tests/run.php          раннер тестов
 tests/support.php      помощники, заглушки, FakeClient
 tests/stub/            поддельный сервер модели для тестов AiClient
@@ -283,11 +288,12 @@ echo $agent->ask('«Не приходит SMS с кодом, второй ден
 php tests/run.php
 ```
 
-149 проверок: калькулятор, время, реестр, обрезка результатов, весь цикл агента
+161 проверка: калькулятор, время, реестр, обрезка результатов, весь цикл агента
 (включая ошибку инструмента и лимит раундов), настройки, хуки, finish,
 файлы и песочница (включая свободный режим), CSV, единицы, даты, uuid/хеши,
 сборка HTTP-запроса, защита от SSRF (IPv6, закрепление адресов против DNS
 rebinding), оболочка (таймаут от модели, allowlist и попытки его обойти),
+SQL (режим только чтения и попытки его обойти — на SQLite в памяти),
 повторы при 429/5xx, стоимость и накопление usage. Внешняя сеть не нужна — модель
 подменяется `FakeClient` из `tests/support.php`, а `AiClient` проверяется по
 настоящему HTTP против поддельного сервера `tests/stub/llm-server.php`.

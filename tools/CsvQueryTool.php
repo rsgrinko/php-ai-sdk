@@ -6,6 +6,7 @@ namespace AiSdk\Tools;
 
 use AiSdk\Tool;
 use AiSdk\Tools\Support\Bytes;
+use AiSdk\Tools\Support\TextTable;
 
 /**
  * Выборка из CSV-файла внутри песочницы.
@@ -74,7 +75,7 @@ final class CsvQueryTool implements Tool
                 continue;
             }
 
-            $table[] = array_map(fn (int $i): string => $this->cell($row[$i] ?? ''), $columns);
+            $table[] = array_map(static fn (int $i): string => TextTable::cell($row[$i] ?? '', self::CELL_MAX), $columns);
 
             if (count($table) > $limit) {
                 break;
@@ -87,7 +88,7 @@ final class CsvQueryTool implements Tool
             return 'Подходящих строк нет (всего строк: ' . count($rows) . ').';
         }
 
-        return 'CSV ' . $path . ': ' . $found . ' из ' . count($rows) . " строк\n" . $this->render($table);
+        return 'CSV ' . $path . ': ' . $found . ' из ' . count($rows) . " строк\n" . TextTable::render($table);
     }
 
     /**
@@ -203,50 +204,4 @@ final class CsvQueryTool implements Tool
 
         return mb_strtolower($cell) === mb_strtolower($filter['value']);
     }
-
-    private function cell(string $value): string
-    {
-        $value = str_replace(["\r", "\n"], ' ', $value);
-
-        return mb_strlen($value) > self::CELL_MAX
-            ? mb_substr($value, 0, self::CELL_MAX) . '…'
-            : $value;
-    }
-
-
-    /**
-     * @param list<list<string>> $table
-     */
-    private function render(array $table): string
-    {
-        $widths = [];
-
-        foreach ($table as $row) {
-            foreach ($row as $index => $cell) {
-                $widths[$index] = max($widths[$index] ?? 0, mb_strlen($cell));
-            }
-        }
-
-        $lines = [];
-
-        foreach ($table as $rowIndex => $row) {
-            $parts = [];
-
-            foreach ($row as $index => $cell) {
-                $parts[] = str_pad($cell, $widths[$index]);
-            }
-
-            $lines[] = implode(' | ', $parts);
-
-            if ($rowIndex === 0) {
-                $lines[] = implode('-+-', array_map(
-                    static fn (int $width): string => str_repeat('-', $width),
-                    $widths
-                ));
-            }
-        }
-
-        return implode("\n", $lines);
-    }
 }
-
