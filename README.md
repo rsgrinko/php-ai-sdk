@@ -93,6 +93,10 @@ examples/
   12-logging.php       логирование запросов к модели
   13-code-task.php     задача «с нуля»: код, тест, правка
   14-hooks.php         прогресс в консоли и остановка через хуки
+  15-csv.php           вопросы к CSV-таблице
+  16-dialog.php        память диалога, смена роли, reset, стоимость
+  17-approval.php      запрет записи через toolApproval
+  18-errors.php        AiException и повторы при недоступной модели
 tests/run.php          раннер тестов
 tests/support.php      помощники, заглушки, FakeClient
 tests/stub/            поддельный сервер модели для тестов AiClient

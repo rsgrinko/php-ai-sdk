@@ -19,8 +19,12 @@
 | `12-logging.php` | логи запросов | `get_time`, `calculator` | `verbose`, `sink` |
 | `13-code-task.php` | агент пишет код и проверяет тестом | `read_file`, `write_file`, `replace_in_file`, `list_dir`, `run_command` | `workdir`, `allow`, `maxRounds` |
 | `14-hooks.php` | прогресс и остановка | `get_time`, `calculator` | `hooks`: onStep, onToolStart, onToolEnd, shouldStop |
+| `15-csv.php` | вопросы к таблице | `csv_query`, `calculator` | песочница |
+| `16-dialog.php` | многоходовый диалог | — | `setSystemPrompt`, `messages`, `usage`, `reset`, `Cost` |
+| `17-approval.php` | запрет опасного действия | `list_dir`, `read_file`, `write_file` | `toolApproval` |
+| `18-errors.php` | ошибки и повторы | — | `Retry`, `Retry::none()`, `AiException` |
 
-`10-http.php` и `11-json.php` работают без модели и без сети — их можно запускать
+`10-http.php`, `11-json.php` и `18-errors.php` работают без модели — их можно запускать
 где угодно. Остальные обращаются к модели из `.env`.
 
 
