@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace AiSdk\Tools;
+namespace Rsgrinko\AiSdk\Tools;
 
-use AiSdk\HttpTransport;
-use AiSdk\Tools\Support\HttpRequest;
-use AiSdk\Tools\Support\Timeout;
-use AiSdk\Tools\Support\UrlGuard;
-use AiSdk\Tool;
+use Rsgrinko\AiSdk\HttpTransport;
+use Rsgrinko\AiSdk\Tools\Support\HttpRequest;
+use Rsgrinko\AiSdk\Tools\Support\Timeout;
+use Rsgrinko\AiSdk\Tools\Support\UrlGuard;
+use Rsgrinko\AiSdk\Tool;
 
 /**
  * HTTP-запрос любого метода: GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS.

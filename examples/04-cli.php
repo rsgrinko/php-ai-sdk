@@ -17,12 +17,12 @@ declare(strict_types=1);
 
 require dirname(__DIR__) . '/bootstrap.php';
 
-use AiSdk\Agent;
-use AiSdk\AiClient;
-use AiSdk\ToolRegistry;
-use AiSdk\Tools\CalculatorTool;
-use AiSdk\Tools\TimeTool;
-use AiSdk\Tools\WeatherTool;
+use Rsgrinko\AiSdk\Agent;
+use Rsgrinko\AiSdk\AiClient;
+use Rsgrinko\AiSdk\ToolRegistry;
+use Rsgrinko\AiSdk\Tools\CalculatorTool;
+use Rsgrinko\AiSdk\Tools\TimeTool;
+use Rsgrinko\AiSdk\Tools\WeatherTool;
 
 $tools = (new ToolRegistry())->add(
     new TimeTool(),

@@ -196,7 +196,7 @@ $tools->add(new ShellTool(
 `DatabaseTool` даёт модели SQL через PDO. Режим задаётся при подключении:
 
 ```php
-use AiSdk\Tools\DatabaseTool;
+use Rsgrinko\AiSdk\Tools\DatabaseTool;
 
 // Только чтение (по умолчанию): SELECT, SHOW, DESCRIBE, EXPLAIN, WITH.
 $db = DatabaseTool::mysql('127.0.0.1', 'shop', 'reader', 'secret');
@@ -251,7 +251,7 @@ MySQL ограничивает только SELECT, MariaDB — любой за�
 Четыре метода. Всё.
 
 ```php
-use AiSdk\Tool;
+use Rsgrinko\AiSdk\Tool;
 
 final class DiceTool implements Tool
 {

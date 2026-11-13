@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace AiSdk\Tools;
+namespace Rsgrinko\AiSdk\Tools;
 
-use AiSdk\Tool;
-use AiSdk\Tools\Support\AtomicWriter;
+use Rsgrinko\AiSdk\Tool;
+use Rsgrinko\AiSdk\Tools\Support\AtomicWriter;
 
 /**
  * Создание и перезапись файла внутри песочницы.

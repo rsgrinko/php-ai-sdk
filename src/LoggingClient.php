@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace AiSdk;
+namespace Rsgrinko\AiSdk;
 
 /**
  * Декоратор ChatClient: пишет каждый запрос и ответ в лог.

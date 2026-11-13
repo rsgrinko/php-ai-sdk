@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace AiSdk;
+namespace Rsgrinko\AiSdk;
 
 /**
  * Инструмент, который модель может вызвать.

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace AiSdk\Tools\Support;
+namespace Rsgrinko\AiSdk\Tools\Support;
 
 /**
  * Защита от SSRF: пропускает только публичные http/https-адреса.

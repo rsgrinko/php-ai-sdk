@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace AiSdk\Tools\Support;
+namespace Rsgrinko\AiSdk\Tools\Support;
 
 /**
  * Атомарная запись файла: сначала во временный файл рядом, потом rename.

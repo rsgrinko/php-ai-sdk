@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 // Общие помощники и заглушки для тестов.
 
-use AiSdk\ChatClient;
-use AiSdk\ChatResult;
+use Rsgrinko\AiSdk\ChatClient;
+use Rsgrinko\AiSdk\ChatResult;
 
 /**
  * Тесты SDK: без сети, без модели и без API-ключа.

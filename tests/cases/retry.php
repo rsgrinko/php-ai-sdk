@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 // Тесты: повтор запроса к модели при временных сбоях. Без сети и без пауз.
 
-use AiSdk\AiException;
-use AiSdk\Retry;
+use Rsgrinko\AiSdk\AiException;
+use Rsgrinko\AiSdk\Retry;
 
 /**
  * Retry с записью пауз вместо реального ожидания.

@@ -244,7 +244,7 @@ LLM ← tool_calls: get_time, calculator, 6084 мс, токены 377/44
 лишнего запроса к модели.
 
 ```php
-use AiSdk\Tools\FinishTool;
+use Rsgrinko\AiSdk\Tools\FinishTool;
 
 $agent = new Agent(
     client: $client,

@@ -14,7 +14,7 @@ declare(strict_types=1);
 
 require dirname(__DIR__) . '/bootstrap.php';
 
-use AiSdk\AiClient;
+use Rsgrinko\AiSdk\AiClient;
 
 $client = AiClient::fromEnv();
 

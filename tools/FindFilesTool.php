@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace AiSdk\Tools;
+namespace Rsgrinko\AiSdk\Tools;
 
-use AiSdk\Tool;
-use AiSdk\Tools\Support\Bytes;
-use AiSdk\Tools\Support\FileWalker;
+use Rsgrinko\AiSdk\Tool;
+use Rsgrinko\AiSdk\Tools\Support\Bytes;
+use Rsgrinko\AiSdk\Tools\Support\FileWalker;
 
 /**
  * Поиск файлов по маске имени внутри песочницы.

@@ -9,7 +9,7 @@ test('архитектура: ядро не зависит от инструме
         $code = (string) file_get_contents($file);
 
         assertTrue(
-            preg_match('/^use AiSdk\\\\Tools\\\\/m', $code) !== 1,
+            preg_match('/^use Rsgrinko\\\\AiSdk\\\\Tools\\\\/m', $code) !== 1,
             'ядро импортирует инструменты: ' . basename($file)
         );
     }

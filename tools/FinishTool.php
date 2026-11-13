@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace AiSdk\Tools;
+namespace Rsgrinko\AiSdk\Tools;
 
-use AiSdk\Tool;
+use Rsgrinko\AiSdk\Tool;
 
 /**
  * Явное завершение работы.

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 // Тесты: database. SQLite в памяти — тот же PDO, сервер не нужен.
 
-use AiSdk\Tools\DatabaseTool;
-use AiSdk\Tools\Support\TextTable;
+use Rsgrinko\AiSdk\Tools\DatabaseTool;
+use Rsgrinko\AiSdk\Tools\Support\TextTable;
 
 function demoDb(): PDO
 {

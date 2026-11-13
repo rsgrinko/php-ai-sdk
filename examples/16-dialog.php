@@ -17,10 +17,10 @@ declare(strict_types=1);
 
 require dirname(__DIR__) . '/bootstrap.php';
 
-use AiSdk\Agent;
-use AiSdk\AiClient;
-use AiSdk\Cost;
-use AiSdk\Env;
+use Rsgrinko\AiSdk\Agent;
+use Rsgrinko\AiSdk\AiClient;
+use Rsgrinko\AiSdk\Cost;
+use Rsgrinko\AiSdk\Env;
 
 $agent = new Agent(
     client: AiClient::fromEnv(timeout: 120.0),

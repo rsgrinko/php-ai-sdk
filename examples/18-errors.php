@@ -19,10 +19,10 @@ declare(strict_types=1);
 
 require dirname(__DIR__) . '/bootstrap.php';
 
-use AiSdk\Agent;
-use AiSdk\AiClient;
-use AiSdk\AiException;
-use AiSdk\Retry;
+use Rsgrinko\AiSdk\Agent;
+use Rsgrinko\AiSdk\AiClient;
+use Rsgrinko\AiSdk\AiException;
+use Rsgrinko\AiSdk\Retry;
 
 // На порту 9 локально никто не слушает: соединение отклоняется сразу.
 // Если у вас задан HTTP_PROXY, добавьте 127.0.0.1 в NO_PROXY.

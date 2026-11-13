@@ -20,13 +20,13 @@ declare(strict_types=1);
 
 require dirname(__DIR__) . '/bootstrap.php';
 
-use AiSdk\Agent;
-use AiSdk\AgentHooks;
-use AiSdk\AiClient;
-use AiSdk\Env;
-use AiSdk\ToolRegistry;
-use AiSdk\Tools\DatabaseTool;
-use AiSdk\Tools\FinishTool;
+use Rsgrinko\AiSdk\Agent;
+use Rsgrinko\AiSdk\AgentHooks;
+use Rsgrinko\AiSdk\AiClient;
+use Rsgrinko\AiSdk\Env;
+use Rsgrinko\AiSdk\ToolRegistry;
+use Rsgrinko\AiSdk\Tools\DatabaseTool;
+use Rsgrinko\AiSdk\Tools\FinishTool;
 
 $host = Env::get('DB_HOST', '') ?? '';
 

@@ -4,15 +4,15 @@ declare(strict_types=1);
 
 // Тесты: таймаут от модели, стоимость запроса, накопление usage.
 
-use AiSdk\Agent;
-use AiSdk\ChatResult;
-use AiSdk\Cost;
-use AiSdk\ToolRegistry;
-use AiSdk\Tools\HttpRequestTool;
-use AiSdk\Tools\ShellTool;
-use AiSdk\Tools\CalculatorTool;
-use AiSdk\Tools\Support\Number;
-use AiSdk\Tools\Support\Timeout;
+use Rsgrinko\AiSdk\Agent;
+use Rsgrinko\AiSdk\ChatResult;
+use Rsgrinko\AiSdk\Cost;
+use Rsgrinko\AiSdk\ToolRegistry;
+use Rsgrinko\AiSdk\Tools\HttpRequestTool;
+use Rsgrinko\AiSdk\Tools\ShellTool;
+use Rsgrinko\AiSdk\Tools\CalculatorTool;
+use Rsgrinko\AiSdk\Tools\Support\Number;
+use Rsgrinko\AiSdk\Tools\Support\Timeout;
 
 test('timeout: значение модели в пределах максимума', function (): void {
     assertSame(5.0, Timeout::seconds(['timeout' => 5], 10.0, 60.0));

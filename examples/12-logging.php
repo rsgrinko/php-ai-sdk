@@ -16,14 +16,14 @@ declare(strict_types=1);
 
 require dirname(__DIR__) . '/bootstrap.php';
 
-use AiSdk\Agent;
-use AiSdk\AiClient;
-use AiSdk\Cost;
-use AiSdk\Env;
-use AiSdk\LoggingClient;
-use AiSdk\ToolRegistry;
-use AiSdk\Tools\CalculatorTool;
-use AiSdk\Tools\TimeTool;
+use Rsgrinko\AiSdk\Agent;
+use Rsgrinko\AiSdk\AiClient;
+use Rsgrinko\AiSdk\Cost;
+use Rsgrinko\AiSdk\Env;
+use Rsgrinko\AiSdk\LoggingClient;
+use Rsgrinko\AiSdk\ToolRegistry;
+use Rsgrinko\AiSdk\Tools\CalculatorTool;
+use Rsgrinko\AiSdk\Tools\TimeTool;
 
 // Приёмник — обычный колбэк. Вместо echo можно писать в свой логгер.
 $client = new LoggingClient(

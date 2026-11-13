@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace AiSdk\Tools;
+namespace Rsgrinko\AiSdk\Tools;
 
-use AiSdk\Tool;
-use AiSdk\Tools\Support\TextTable;
+use Rsgrinko\AiSdk\Tool;
+use Rsgrinko\AiSdk\Tools\Support\TextTable;
 
 /**
  * SQL-запросы к базе данных через PDO (MySQL/MariaDB, а также SQLite и PostgreSQL).

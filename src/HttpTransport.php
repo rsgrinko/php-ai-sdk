@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace AiSdk;
+namespace Rsgrinko\AiSdk;
 
 /**
  * Минимальный HTTP-клиент без зависимостей.

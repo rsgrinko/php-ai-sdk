@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace AiSdk\Tools;
+namespace Rsgrinko\AiSdk\Tools;
 
-use AiSdk\HttpTransport;
-use AiSdk\Tool;
+use Rsgrinko\AiSdk\HttpTransport;
+use Rsgrinko\AiSdk\Tool;
 
 /**
  * Пример инструмента с обращением к внешнему API.

@@ -17,10 +17,10 @@ declare(strict_types=1);
 
 require dirname(__DIR__) . '/bootstrap.php';
 
-use AiSdk\Agent;
-use AiSdk\AiClient;
-use AiSdk\Tool;
-use AiSdk\ToolRegistry;
+use Rsgrinko\AiSdk\Agent;
+use Rsgrinko\AiSdk\AiClient;
+use Rsgrinko\AiSdk\Tool;
+use Rsgrinko\AiSdk\ToolRegistry;
 
 /**
  * Инструмент «сведения о сервере».

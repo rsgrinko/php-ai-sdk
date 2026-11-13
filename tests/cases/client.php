@@ -5,12 +5,12 @@ declare(strict_types=1);
 // Тесты: AiClient по настоящему HTTP против поддельного сервера
 // (tests/stub/llm-server.php). Внешняя сеть не нужна.
 
-use AiSdk\Agent;
-use AiSdk\AiClient;
-use AiSdk\AiException;
-use AiSdk\Retry;
-use AiSdk\ToolRegistry;
-use AiSdk\Tools\CalculatorTool;
+use Rsgrinko\AiSdk\Agent;
+use Rsgrinko\AiSdk\AiClient;
+use Rsgrinko\AiSdk\AiException;
+use Rsgrinko\AiSdk\Retry;
+use Rsgrinko\AiSdk\ToolRegistry;
+use Rsgrinko\AiSdk\Tools\CalculatorTool;
 
 /**
  * Поднять встроенный сервер PHP один раз на весь прогон.

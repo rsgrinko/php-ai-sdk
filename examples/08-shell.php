@@ -18,7 +18,7 @@ declare(strict_types=1);
 
 require dirname(__DIR__) . '/bootstrap.php';
 
-use AiSdk\Tools\ShellTool;
+use Rsgrinko\AiSdk\Tools\ShellTool;
 
 // Рабочий каталог фиксируем: команда не «гуляет» по всей машине случайно.
 // tmpDir задаём явно: системный temp бывает недоступен в контейнерах.

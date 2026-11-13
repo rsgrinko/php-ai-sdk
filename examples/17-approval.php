@@ -18,13 +18,13 @@ declare(strict_types=1);
 
 require dirname(__DIR__) . '/bootstrap.php';
 
-use AiSdk\Agent;
-use AiSdk\AiClient;
-use AiSdk\ToolRegistry;
-use AiSdk\Tools\FileSandbox;
-use AiSdk\Tools\ListDirTool;
-use AiSdk\Tools\ReadFileTool;
-use AiSdk\Tools\WriteFileTool;
+use Rsgrinko\AiSdk\Agent;
+use Rsgrinko\AiSdk\AiClient;
+use Rsgrinko\AiSdk\ToolRegistry;
+use Rsgrinko\AiSdk\Tools\FileSandbox;
+use Rsgrinko\AiSdk\Tools\ListDirTool;
+use Rsgrinko\AiSdk\Tools\ReadFileTool;
+use Rsgrinko\AiSdk\Tools\WriteFileTool;
 
 $root = __DIR__ . '/var/approval';
 @mkdir($root, 0777, true);

@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 // Тесты: http. Запускаются из tests/run.php.
 
-use AiSdk\AiException;
-use AiSdk\HttpTransport;
-use AiSdk\Tools\Support\HttpRequest;
-use AiSdk\Tool;
-use AiSdk\Tools\HttpRequestTool;
-use AiSdk\Tools\Support\UrlGuard;
+use Rsgrinko\AiSdk\AiException;
+use Rsgrinko\AiSdk\HttpTransport;
+use Rsgrinko\AiSdk\Tools\Support\HttpRequest;
+use Rsgrinko\AiSdk\Tool;
+use Rsgrinko\AiSdk\Tools\HttpRequestTool;
+use Rsgrinko\AiSdk\Tools\Support\UrlGuard;
 
 // ---------------------------------------------------------------------------
 // http_request: сборка запроса (без сети)

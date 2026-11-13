@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace AiSdk\Tools;
+namespace Rsgrinko\AiSdk\Tools;
 
 /**
  * Ограничитель файловых инструментов.

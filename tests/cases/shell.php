@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 // Тесты: shell. Запускаются из tests/run.php.
 
-use AiSdk\Tools\ShellTool;
+use Rsgrinko\AiSdk\Tools\ShellTool;
 
 // ---------------------------------------------------------------------------
 // run_command: оболочка

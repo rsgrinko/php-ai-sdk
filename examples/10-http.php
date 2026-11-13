@@ -17,8 +17,8 @@ declare(strict_types=1);
 
 require dirname(__DIR__) . '/bootstrap.php';
 
-use AiSdk\Tools\Support\HttpRequest;
-use AiSdk\Tools\HttpRequestTool;
+use Rsgrinko\AiSdk\Tools\Support\HttpRequest;
+use Rsgrinko\AiSdk\Tools\HttpRequestTool;
 
 // 1. Сборка запроса — то же, что делает инструмент внутри.
 $request = HttpRequest::build(

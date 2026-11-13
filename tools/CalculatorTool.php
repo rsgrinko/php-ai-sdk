@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace AiSdk\Tools;
+namespace Rsgrinko\AiSdk\Tools;
 
-use AiSdk\Tool;
-use AiSdk\Tools\Support\Number;
+use Rsgrinko\AiSdk\Tool;
+use Rsgrinko\AiSdk\Tools\Support\Number;
 
 /**
  * Арифметика без eval(): рекурсивный спуск по выражению.

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace AiSdk;
+namespace Rsgrinko\AiSdk;
 
 /**
  * Чтение настроек из .env без единой зависимости.

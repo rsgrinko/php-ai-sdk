@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace AiSdk\Tools\Support;
+namespace Rsgrinko\AiSdk\Tools\Support;
 
 /**
  * Таймаут, который может попросить сама модель (аргумент timeout).

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace AiSdk;
+namespace Rsgrinko\AiSdk;
 
 /**
  * Набор инструментов: хранит их, отдаёт схемы модели и вызывает по имени.

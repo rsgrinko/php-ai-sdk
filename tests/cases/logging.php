@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 // Тесты: logging. Запускаются из tests/run.php.
 
-use AiSdk\Agent;
-use AiSdk\ChatClient;
-use AiSdk\ChatResult;
-use AiSdk\LoggingClient;
-use AiSdk\ToolRegistry;
-use AiSdk\Tools\CalculatorTool;
-use AiSdk\Tools\TimeTool;
+use Rsgrinko\AiSdk\Agent;
+use Rsgrinko\AiSdk\ChatClient;
+use Rsgrinko\AiSdk\ChatResult;
+use Rsgrinko\AiSdk\LoggingClient;
+use Rsgrinko\AiSdk\ToolRegistry;
+use Rsgrinko\AiSdk\Tools\CalculatorTool;
+use Rsgrinko\AiSdk\Tools\TimeTool;
 
 // ---------------------------------------------------------------------------
 // Логирование

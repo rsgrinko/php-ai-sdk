@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 // Тесты: agent. Запускаются из tests/run.php.
 
-use AiSdk\Agent;
-use AiSdk\Tool;
-use AiSdk\ToolRegistry;
-use AiSdk\Tools\CalculatorTool;
-use AiSdk\Tools\FinishTool;
+use Rsgrinko\AiSdk\Agent;
+use Rsgrinko\AiSdk\Tool;
+use Rsgrinko\AiSdk\ToolRegistry;
+use Rsgrinko\AiSdk\Tools\CalculatorTool;
+use Rsgrinko\AiSdk\Tools\FinishTool;
 
 // ---------------------------------------------------------------------------
 // Агент

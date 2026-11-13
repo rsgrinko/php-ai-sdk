@@ -17,12 +17,12 @@ declare(strict_types=1);
 
 require dirname(__DIR__) . '/bootstrap.php';
 
-use AiSdk\ToolRegistry;
-use AiSdk\Tools\ConvertUnitsTool;
-use AiSdk\Tools\DateCalcTool;
-use AiSdk\Tools\HashTool;
-use AiSdk\Tools\JsonQueryTool;
-use AiSdk\Tools\UuidTool;
+use Rsgrinko\AiSdk\ToolRegistry;
+use Rsgrinko\AiSdk\Tools\ConvertUnitsTool;
+use Rsgrinko\AiSdk\Tools\DateCalcTool;
+use Rsgrinko\AiSdk\Tools\HashTool;
+use Rsgrinko\AiSdk\Tools\JsonQueryTool;
+use Rsgrinko\AiSdk\Tools\UuidTool;
 
 $registry = (new ToolRegistry())->add(
     new JsonQueryTool(),

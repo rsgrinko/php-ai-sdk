@@ -18,12 +18,12 @@ declare(strict_types=1);
 
 require dirname(__DIR__) . '/bootstrap.php';
 
-use AiSdk\Agent;
-use AiSdk\AiClient;
-use AiSdk\ToolRegistry;
-use AiSdk\Tools\CalculatorTool;
-use AiSdk\Tools\CsvQueryTool;
-use AiSdk\Tools\FileSandbox;
+use Rsgrinko\AiSdk\Agent;
+use Rsgrinko\AiSdk\AiClient;
+use Rsgrinko\AiSdk\ToolRegistry;
+use Rsgrinko\AiSdk\Tools\CalculatorTool;
+use Rsgrinko\AiSdk\Tools\CsvQueryTool;
+use Rsgrinko\AiSdk\Tools\FileSandbox;
 
 $root = __DIR__ . '/var/csv';
 @mkdir($root, 0777, true);

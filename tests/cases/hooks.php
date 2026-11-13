@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 // Тесты: хуки агента — шаги, инструменты, ответ, остановка.
 
-use AiSdk\Agent;
-use AiSdk\AgentHooks;
-use AiSdk\ToolRegistry;
-use AiSdk\Tools\CalculatorTool;
-use AiSdk\Tools\FinishTool;
+use Rsgrinko\AiSdk\Agent;
+use Rsgrinko\AiSdk\AgentHooks;
+use Rsgrinko\AiSdk\ToolRegistry;
+use Rsgrinko\AiSdk\Tools\CalculatorTool;
+use Rsgrinko\AiSdk\Tools\FinishTool;
 
 test('hooks: шаги, инструменты и ответ идут по порядку', function (): void {
     $events = [];

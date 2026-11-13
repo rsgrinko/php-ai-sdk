@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace AiSdk\Tools\Support;
+namespace Rsgrinko\AiSdk\Tools\Support;
 
 /**
  * Разобранный HTTP-запрос: метод, URL, заголовки, тело.

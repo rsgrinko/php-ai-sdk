@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace AiSdk\Tools\Support;
+namespace Rsgrinko\AiSdk\Tools\Support;
 
 /**
  * Число для ответа модели: без хвостовых нулей и без экспоненты, пока это

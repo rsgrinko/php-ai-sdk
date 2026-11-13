@@ -17,7 +17,7 @@ declare(strict_types=1);
 
 require dirname(__DIR__) . '/bootstrap.php';
 
-use AiSdk\Tools\DatabaseTool;
+use Rsgrinko\AiSdk\Tools\DatabaseTool;
 
 $pdo = new PDO('sqlite::memory:');
 $pdo->exec('CREATE TABLE orders (id INTEGER PRIMARY KEY, client TEXT, city TEXT, total INTEGER, paid_at TEXT)');
